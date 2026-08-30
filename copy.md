@@ -10,10 +10,10 @@ A draft list built for your league, tested against a simulated season.
 Your league
 
 ## weights-heading
-What to trust
+Simulation weighting
 
 ## weights-hint
-0 trusts this year's projections. 100 trusts last season's results. Rookies keep their projection either way.
+Slide toward projections if you trust this year's outlook more. Slide toward last year if you trust results more. Rookies keep their projection either way — there's nothing to weigh.
 
 ## build-button
 Build my list
@@ -22,13 +22,25 @@ Build my list
 Your list
 
 ## list-hint
-Arrows move a player. Click a row for news. This exact order is what you download.
+Arrows move a player. Click a row for the full breakdown, news, and to check his draft odds. This exact order is what you download.
 
 ## tips-heading
-20 from the news
+20 to watch
 
 ## tips-hint
-Players worth a look before you draft, from recent ESPN coverage.
+News-flagged players, and players sitting well past their usual ADP under your league's scoring — worth a look either way.
+
+## roster-heading
+Your likely starting roster
+
+## roster-hint
+One example draft using this exact list, against eleven teams on Yahoo's default board. Reorder your list above and this updates.
+
+## avail-heading
+Can I get this guy?
+
+## avail-hint
+For each of your next targets: the pick where taking him is a real decision, and how often he lasts that long against eleven default-board opponents. Reorder your list to see the odds change.
 
 ## sim-heading
 Test it against a season

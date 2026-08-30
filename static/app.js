@@ -15,10 +15,15 @@ SLOTS.forEach(s => {
   l.append(i); $("#roster").append(l);
 });
 
-$("#lastw").addEventListener("input", () => { $("#lastwv").textContent = $("#lastw").value; });
+$("#lastw").addEventListener("input", () => {
+  const v = +$("#lastw").value;
+  $("#lastwv-proj").textContent = 100 - v;
+  $("#lastwv-last").textContent = v;
+});
 
 let ORDER = [];        // current list, user-editable
 let PLAYERS = {};      // name -> player
+let reorderTimer = null;
 
 function cfg() {
   const roster = {};
@@ -54,39 +59,60 @@ $("#cfg").addEventListener("submit", async e => {
     PLAYERS = {};
     d.players.forEach(p => { PLAYERS[p.name] = p; });
     renderBoard();
-    $("#tiplist").replaceChildren(...d.tips.map(t => {
-      const li = el("li");
-      li.append(el("b", null, `${t.name} (${t.pos})`),
-                document.createTextNode(" " + t.headline));
-      return li;
-    }));
+    renderTips(d.tips);
+    renderRosterPreview(d.rosterPreview);
     $("#listwrap").hidden = false;
+    $("#rosterwrap").hidden = false;
+    $("#availwrap").hidden = false;
     $("#simwrap").hidden = false;
     $("#simout").hidden = true;
     $("#msg").textContent = "";
+    refreshAvailability();
     $("#listwrap").scrollIntoView({ behavior: "smooth" });
   } catch (err) { $("#msg").textContent = err.message; }
   finally { btn.disabled = false; }
 });
 
+function renderTips(tips) {
+  $("#tiplist").replaceChildren(...tips.map(t => {
+    const li = el("li");
+    const kind = el("span", "kind", t.kind === "news" ? "News" : "Value");
+    li.append(kind, el("b", null, `${t.name} (${t.pos})`),
+              document.createTextNode(" " + t.headline));
+    if (t.url) {
+      const a = el("a"); a.href = t.url; a.target = "_blank";
+      a.rel = "noopener"; a.textContent = "Read more →";
+      li.append(a);
+    }
+    return li;
+  }));
+}
+
+// ── list / detail ──
 function renderBoard() {
+  const starters = starterCount();
   const board = $("#board");
   board.replaceChildren();
   ORDER.forEach((name, i) => {
     const p = PLAYERS[name];
-    const row = el("div", "row");
+    const row = el("div", "row" + (i < starters ? " starter" : ""));
     row.append(el("span", "rk", i + 1),
                el("span", "pos", p.pos),
                el("span", "nm", `${p.name}${p.bye ? " · bye " + p.bye : ""}`),
                el("span", "pts", p.pts));
     const mv = el("span", "mv");
     const up = el("button", null, "▲"), dn = el("button", null, "▼");
+    up.type = "button"; dn.type = "button";
     up.onclick = ev => { ev.stopPropagation(); move(i, -1); };
     dn.onclick = ev => { ev.stopPropagation(); move(i, +1); };
     mv.append(up, dn); row.append(mv);
-    row.onclick = () => toggleTidbit(row, p);
+    row.onclick = () => toggleDetail(row, p);
     board.append(row);
   });
+}
+
+function starterCount() {
+  return Object.values(cfg().roster).reduce((a, b) => a + b, 0);
 }
 
 function move(i, d) {
@@ -94,18 +120,151 @@ function move(i, d) {
   if (j < 0 || j >= ORDER.length) return;
   [ORDER[i], ORDER[j]] = [ORDER[j], ORDER[i]];
   renderBoard();
+  scheduleReorderRefresh();
 }
 
-function toggleTidbit(row, p) {
-  if (row.nextSibling?.classList?.contains("tidbit")) {
+// Reordering changes both the likely roster and the availability odds.
+// Debounced so a burst of arrow clicks does not fire a request per click.
+function scheduleReorderRefresh() {
+  clearTimeout(reorderTimer);
+  reorderTimer = setTimeout(() => {
+    refreshRosterPreview();
+    refreshAvailability();
+  }, 500);
+}
+
+function toggleDetail(row, p) {
+  if (row.nextSibling?.classList?.contains("detail")) {
     row.nextSibling.remove(); return;
   }
-  document.querySelectorAll(".tidbit").forEach(t => t.remove());
-  const t = el("div", "tidbit",
-    p.tidbit || "No recent ESPN coverage.");
-  row.after(t);
+  document.querySelectorAll(".detail").forEach(d => d.remove());
+  row.after(buildDetail(p));
 }
 
+function buildDetail(p) {
+  const d = el("div", "detail");
+
+  const stats = el("div", "stats");
+  const stat = (label, val) => {
+    const s = el("div", "stat");
+    s.append(el("b", null, val), el("span", null, label));
+    stats.append(s);
+  };
+  stat("Points (blended)", p.pts);
+  stat("Projection", p.proj);
+  stat("Last season", p.actual != null ? p.actual : "no data");
+  stat("Edge over replacement", p.vorp != null ? p.vorp : "—");
+  stat(`${p.pos} rank`, p.posRank || "—");
+  if (p.dropToNext) stat("Points above next " + p.pos, p.dropToNext);
+  stat("Weekly variance", p.measured ? `±${p.sd}` : `±${p.sd} (estimated)`);
+  d.append(stats);
+
+  if (p.news && p.news.length) {
+    const n = el("div", "news");
+    n.append(el("h3", null, "Recent news"));
+    p.news.forEach(a => {
+      const row = el("div");
+      const link = el("a"); link.href = a.url; link.target = "_blank";
+      link.rel = "noopener"; link.textContent = a.headline;
+      const time = el("time", null, a.published);
+      row.append(link, time);
+      n.append(row);
+    });
+    d.append(n);
+  } else {
+    const n = el("div", "news");
+    n.append(el("h3", null, "Recent news"), el("p", null, "No recent ESPN coverage found."));
+    d.append(n);
+  }
+
+  const avail = el("div", "avail");
+  const btn = el("button", "ghost", "Check draft odds for this player");
+  btn.type = "button";
+  btn.onclick = async () => {
+    btn.disabled = true; btn.textContent = "Checking…";
+    try {
+      const r = await post("/api/availability", cfg());
+      const hit = r.players.find(a => a.name === p.name);
+      btn.replaceWith(availSummary(hit));
+    } catch (e) {
+      btn.textContent = "Check draft odds for this player";
+      btn.disabled = false;
+    }
+  };
+  avail.append(btn);
+  d.append(avail);
+
+  return d;
+}
+
+function availSummary(hit) {
+  if (!hit) return el("p", "hint", "Not tracked — outside your top targets.");
+  const p = el("p", "hint");
+  p.innerHTML = `At pick <b>${hit.atPick}</b> (usual ADP ${hit.adp}), he lasts that long in <b>${hit.pct}%</b> of drafts.`;
+  return p;
+}
+
+// ── roster preview ──
+function renderRosterPreview(roster) {
+  const box = $("#rosterpreview");
+  box.replaceChildren();
+  if (!roster || !roster.length) {
+    box.append(el("p", "hint", "Not enough players in the pool to fill this roster."));
+    return;
+  }
+  roster.forEach(p => {
+    const slot = el("div", "slot");
+    slot.append(el("div", "lbl", p.slot));
+    const nm = el("div", "nm");
+    nm.append(document.createTextNode(`${p.name} (${p.pos})`),
+              el("span", "pts", `${p.pts} pts${p.bye ? " · bye " + p.bye : ""}`));
+    slot.append(nm);
+    box.append(slot);
+  });
+}
+
+async function refreshRosterPreview() {
+  try {
+    const d = await post("/api/roster-preview", cfg());
+    renderRosterPreview(d.roster);
+  } catch { /* the build already validated the league; a transient failure here is not worth surfacing */ }
+}
+
+// ── availability ──
+function bandFor(pct) {
+  if (pct >= 60) return "";
+  if (pct >= 25) return "risky";
+  return "long";
+}
+
+function renderAvailability(players) {
+  const box = $("#availlist");
+  box.replaceChildren();
+  if (!players || !players.length) {
+    box.append(el("p", "availmsg", "No contested picks in range yet."));
+    return;
+  }
+  players.forEach(a => {
+    const row = el("div", "availrow");
+    const nm = el("span", "nm");
+    nm.append(el("span", "pos", a.pos), document.createTextNode(a.name));
+    const meta = el("span", "meta", `pick ${a.atPick} · ADP ${a.adp}`);
+    const bar = el("span", "availbar " + bandFor(a.pct));
+    const i = el("i"); i.style.width = a.pct + "%"; bar.append(i);
+    const pct = el("span", "pct", a.pct + "%");
+    row.append(nm, meta, bar, pct);
+    box.append(row);
+  });
+}
+
+async function refreshAvailability() {
+  try {
+    const d = await post("/api/availability", cfg());
+    renderAvailability(d.players);
+  } catch { /* stale odds beat a broken panel; leave the last good render */ }
+}
+
+// ── season simulation ──
 $("#simgo").addEventListener("click", async () => {
   const btn = $("#simgo");
   btn.disabled = true; $("#simmsg").textContent = "Playing seasons…";
@@ -136,6 +295,7 @@ $("#simgo").addEventListener("click", async () => {
     });
     $("#simout").hidden = false;
     $("#simmsg").textContent = "";
+    $("#simout").scrollIntoView({ behavior: "smooth" });
   } catch (err) { $("#simmsg").textContent = err.message; }
   finally { btn.disabled = false; }
 });

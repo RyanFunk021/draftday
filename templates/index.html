@@ -36,10 +36,9 @@
 
     <h2>{{ c['weights-heading'] }}</h2>
     <div class="weights">
-      <span>Projections</span>
+      <div class="ends"><b id="lastwv-proj">50</b> projections &middot; last year <b id="lastwv-last">50</b></div>
       <input id="lastw" type="range" min="0" max="100" value="50">
-      <span>Last season</span>
-      <b id="lastwv">50</b>
+      <div class="ends"><span>This year's projections</span><span>Last year's results</span></div>
     </div>
     <p class="hint">{{ c['weights-hint'] }}</p>
 
@@ -56,9 +55,21 @@
     <aside id="tips">
       <h3>{{ c['tips-heading'] }}</h3>
       <p class="hint">{{ c['tips-hint'] }}</p>
-      <ol id="tiplist"></ol>
+      <ol class="tiplist" id="tiplist"></ol>
     </aside>
   </div>
+</section>
+
+<section id="rosterwrap" class="card" hidden>
+  <h2>{{ c['roster-heading'] }}</h2>
+  <p class="hint">{{ c['roster-hint'] }}</p>
+  <div id="rosterpreview" class="roster-preview"></div>
+</section>
+
+<section id="availwrap" class="card" hidden>
+  <h2>{{ c['avail-heading'] }}</h2>
+  <p class="hint">{{ c['avail-hint'] }}</p>
+  <div id="availlist"></div>
 </section>
 
 <section id="simwrap" class="card" hidden>

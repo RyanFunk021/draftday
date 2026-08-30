@@ -71,5 +71,7 @@ def load_pool(scoring: dict, last_weight: int = 50) -> list[dict]:
             "actual": round(actual, 1) if actual is not None else None,
             "sd": round(sd, 1),
             "measured": bool(stats),
+            # Points allowed per game, defenses only. Not used in scoring
+            "pa_pg": _f(r.get("pa_pg")) if pos == "DEF" else None,
         })
     return pool

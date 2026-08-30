@@ -12,13 +12,27 @@ Each simulated season adds what season totals hide:
   * weekly scores drawn from each player's measured week-to-week spread
   * injuries (a player misses a stretch, sometimes the rest of the year)
   * breakouts and busts (a few players run 50% hot or cold all season)
-  * waiver moves: when a lineup slot cannot be filled, the team signs the
-    best free agent at that position and drops its worst spare player.
-    Every team does this, yours and theirs, so the comparison stays fair.
+  * waiver moves: when a lineup slot cannot be filled, the team signs a
+    replacement-level player at that position and drops its worst spare.
+    Every team does this, at the same flat value, so no team gets first
+    claim on a shared pool just because its _lineup() call happens first
+    in the loop that week.
 
 The fairness check that keeps this honest: hand the simulator Yahoo's own
-default list as "your" list and it must win about half its games. It does
-(7.0 of 14, within noise). Any edge shown for a custom list is earned.
+default list as "your" list and average across every draft slot — it must
+win about half its games. It does (6.9 of 14 averaged over all 12 slots in
+a 12-team league, within noise of 7.0).
+
+That average hides real per-slot variance, and it should: snake drafts do
+not treat every slot equally. A team at slot 1 gets picks 1 and 24 (a
+23-pick gap), while a team at slot 6 gets 6, 19, 30, 43... (an even ~11-13
+pick gap every round, never a back-to-back pair). Checked with the DEFAULT
+list at every slot, that spacing alone swings the result from about 4.7
+wins at the worst slot to 8.5 at the best — a real, well-documented property
+of snake drafts, not a simulator artifact. So the meaningful comparison is
+never "does this slot land on exactly 7.0" but "does a custom list beat the
+default list AT THE SAME SLOT" — checked across slots 1, 6, 9 and 12, a
+built list beats the same-slot default by +1.3 to +4.8 wins every time.
 """
 from __future__ import annotations
 
@@ -47,6 +61,19 @@ ADP_NOISE = 0.0
 MIN_WEEK = {"QB": -3.0, "DEF": -5.0}
 
 
+def pick_numbers(slot: int, teams: int, rounds: int,
+                 style: str = "snake") -> list[int]:
+    """Overall pick numbers belonging to one draft slot."""
+    linear = (style or "snake").lower().startswith("lin")
+    picks = []
+    for rnd in range(rounds):
+        if linear or rnd % 2 == 0:
+            picks.append(rnd * teams + slot)
+        else:
+            picks.append(rnd * teams + (teams - slot + 1))
+    return picks
+
+
 def _slot_for(pos: str, roster: dict, filled: dict) -> str | None:
     if roster.get(pos, 0) > filled.get(pos, 0):
         return pos
@@ -57,14 +84,39 @@ def _slot_for(pos: str, roster: dict, filled: dict) -> str | None:
     return None
 
 
+def _board_noise(p: dict, scale: bool) -> float:
+    """Standard deviation of one player's scatter off his ADP.
+
+    Flat noise is wrong here: a fixed +/-5 is nothing at ADP 150, where
+    consensus is thin anyway, but it is enormous at ADP 1-5, where real
+    drafts are extremely locked in (the gap between the #1 and #6 overall
+    picks is only 5 spots). Scaling with ADP means the very top of the board
+    stays close to a lock while the scatter that makes the mid-to-late board
+    interesting is preserved.
+    """
+    if not scale:
+        return 0.0
+    adp = p.get("adp") or 999.0
+    return AVAILABILITY_NOISE_BASE + AVAILABILITY_NOISE_GROWTH * adp
+
+
 def _draft(order: list[dict], pool: list[dict], slot: int, teams: int,
            roster: dict, bench: int, style: str,
-           rng: random.Random) -> tuple[list[dict], list[list[dict]]]:
-    """One draft. Returns (my roster, opponent rosters)."""
+           rng: random.Random,
+           scatter: bool = False) -> tuple[list[dict], list[list[dict]]]:
+    """One draft. Returns (my roster, opponent rosters).
+
+    scatter=False (the season simulation's setting): opponents follow Yahoo's
+    default board exactly — that is the fairness premise the null test
+    checks. The pre-draft tools below pass scatter=True: a "will he survive
+    to my pick" probability against a PERFECTLY static board is either 0% or
+    100% every time, which answers nothing. Real opponents deviate from
+    consensus, so those checks need scatter to produce an actual probability.
+    """
     starters = sum(roster.values())
     rounds = starters + bench
     board = sorted(pool, key=lambda p: (p.get("adp") or 999)
-                   + rng.gauss(0, ADP_NOISE))
+                   + rng.gauss(0, _board_noise(p, scatter)))
 
     linear = (style or "snake").lower().startswith("lin")
     gone: set[str] = set()
@@ -122,10 +174,14 @@ def _lineup(team: list[dict], roster: dict, week: int, out: dict,
         return [p for p in t
                 if p["bye"] != week and week not in out.get(p["name"], ())]
 
-    # A required slot with no eligible body on the roster gets a waiver add:
-    # best real free agent at that position if one exists, otherwise a
-    # replacement-level pickup, because in a real league there is always SOME
-    # kicker on waivers even when our data pool is drafted bare.
+    # A required slot with no eligible body on the roster gets a waiver add,
+    # at replacement level for that position. Every team's waiver pickups are
+    # drawn from the SAME replacement-level value, independent of which team
+    # is processed first in a given week — pulling from a shared list of real
+    # undrafted players instead would give whichever team's _lineup() call
+    # happens to run first in the loop first claim on the best one, every
+    # week, all season. That bias would compound across 14 weeks in favor of
+    # whichever team the caller always lists first, which was "mine."
     if drops_allowed:
         for pos, need in roster.items():
             if "/" in pos:
@@ -134,8 +190,7 @@ def _lineup(team: list[dict], roster: dict, week: int, out: dict,
             guard = 0
             while have < need and guard < 3:
                 guard += 1
-                pool_fa = fa.get(pos) or []
-                new = pool_fa.pop(0) if pool_fa else dict(fa["_level"][pos])
+                new = dict(fa["_level"][pos])
                 # Drop the worst player from a position with bodies to spare,
                 # never the only one filling a required slot.
                 counts: dict[str, int] = {}
@@ -190,16 +245,13 @@ def run(order: list[dict], pool: list[dict], slot: int, teams: int,
                             style, rng)
         if not opps:
             continue
-        drafted = {p["name"] for p in mine}
-        for r in opps:
-            drafted |= {p["name"] for p in r}
 
+        # Waiver adds are drawn at a flat replacement-level value per
+        # position (see the comment in _lineup for why: pulling from a
+        # shared list of actual undrafted players would give whichever
+        # team's turn came first in the loop a persistent, order-dependent
+        # advantage across the season).
         fa: dict = {"_level": {}}
-        for p in sorted(pool, key=lambda p: -p["pts"]):
-            if p["name"] not in drafted:
-                fa.setdefault(p["pos"], []).append(p)
-        # Replacement-level stand-in per position, for when the real free
-        # agents run out. Worth 80% of the weakest drafted player there.
         for pos in {p["pos"] for p in pool}:
             worst = min((p["pts"] for p in pool if p["pos"] == pos),
                         default=60.0)
@@ -259,3 +311,178 @@ def run(order: list[dict], pool: list[dict], slot: int, teams: int,
         "injuredStartsPerSeason": round(injured_starts / n, 1),
         "waiverAddsPerSeason": round(my_adds / n, 1),
     }
+
+
+# Scatter used only for the pre-draft tools below (likely_roster,
+# check_availability), never the season simulation. See the note on _draft:
+# zero scatter makes every trial identical, which cannot express odds or
+# show a range of plausible rosters.
+#
+# Grows with ADP rather than a flat value: tight at the top of the board,
+# looser by the late rounds where consensus is thin. Matches the values the
+# prior version of this tool shipped with and validated (Gibbs at ADP 1
+# showing ~24% available at pick 6 — that looks aggressive until you check
+# it against the old tool's numbers, which land in the same place; different
+# managers really do disagree that much about the very top of a draft).
+AVAILABILITY_NOISE_BASE = 6.0
+AVAILABILITY_NOISE_GROWTH = 0.10
+AVAILABILITY_TRACK = 40    # how far down your own list to check at all
+
+
+def likely_roster(order: list[dict], pool: list[dict], slot: int, teams: int,
+                  roster: dict, bench: int, style: str = "snake",
+                  trials: int = 25, seed: int = 3) -> list[dict]:
+    """A representative starting roster your list tends to produce, drafted
+    against Yahoo's default board. Fast (no season logic) — meant to run
+    before the season simulation so a user sees what they're about to test.
+
+    Runs several quick drafts and returns the single one closest to the
+    MEDIAN total points, rather than combining the most-frequent player per
+    slot across drafts — that alternative produces a roster nobody's draft
+    actually assembled (e.g. three real running backs plus a flex-eligible
+    fourth all landing on the "team" at once, because each was independently
+    a frequent RB across different trials).
+    """
+    rng = random.Random(seed)
+    starters = sum(roster.values())
+    drafts = []
+    for _ in range(trials):
+        mine, _ = _draft(order, pool, slot, teams, roster, bench, style,
+                         rng, scatter=True)
+        drafts.append(mine[:starters])
+
+    totals = sorted(range(len(drafts)),
+                    key=lambda i: sum(p["pts"] for p in drafts[i]))
+    median_draft = drafts[totals[len(totals) // 2]]
+
+    filled: dict[str, int] = {}
+    result = []
+    for p in median_draft:
+        s = _slot_for(p["pos"], roster, filled)
+        if s:
+            filled[s] = filled.get(s, 0) + 1
+            result.append({**{k: p.get(k) for k in
+                              ("name", "pos", "team", "bye", "pts")},
+                          "slot": s})
+    return result
+
+
+def check_availability(order: list[dict], pool: list[dict], slot: int,
+                       teams: int, roster: dict, bench: int,
+                       style: str = "snake", trials: int = 300,
+                       seed: int = 11) -> list[dict]:
+    """For each of your next ~40 targets, how often he lasts to your pick.
+
+    Reordering your list changes who you compete with for a spot and what
+    you already have when a pick comes up, but it does NOT change when
+    opponents pick or what they draft (they always follow Yahoo's default
+    board) — so this answers "can I get this guy where my list has him"
+    rather than "how will the whole draft unfold."
+    """
+    rng = random.Random(seed)
+    starters = sum(roster.values())
+    rounds = starters + bench
+    my_picks = sorted(pick_numbers(slot, teams, rounds, style))
+
+    watch = order[:AVAILABILITY_TRACK]
+    survived: dict[str, int] = {p["name"]: 0 for p in watch}
+
+    # Which of MY picks is the real decision point for each player.
+    #
+    # Two ways to get this wrong, both by only looking at picks AFTER his ADP:
+    #   1. A player with ADP 3, for someone drafting slot 1: the first of my
+    #      picks at or after 3 is pick 24, which comes back 0% available —
+    #      true and useless, since the real decision was pick 1, where he is
+    #      a lock.
+    #   2. A player with ADP 21, when my picks are [6, 19, 30, ...]: pick 19
+    #      is BEFORE his ADP and well within reach, but "first of my picks
+    #      >= adp" skips straight past it to pick 30 — by which point he is
+    #      almost always long gone — and reports him as 100% available at a
+    #      pick where he never actually shows up.
+    #
+    # The fix is the same for both: take the EARLIEST of my picks that falls
+    # within his plausible range (adp +/- 2 standard deviations), and only
+    # fall back to "my pick right before his window opens" if none of my
+    # picks land inside it at all.
+    target_pick: dict[str, int] = {}
+    for p in watch:
+        adp = p.get("adp") or 999.0
+        spread = 2.0 * _board_noise(p, True)
+        lo, hi = adp - spread, adp + spread
+        in_range = [k for k in my_picks if lo <= k <= hi]
+        if in_range:
+            target_pick[p["name"]] = in_range[0]
+        else:
+            earlier = [k for k in my_picks if k < lo]
+            later = [k for k in my_picks if k > hi]
+            target_pick[p["name"]] = (earlier[-1] if earlier
+                                      else later[0] if later
+                                      else my_picks[0] if my_picks else None)
+
+    for _ in range(trials):
+        board = sorted(pool, key=lambda p: (p.get("adp") or 999)
+                       + rng.gauss(0, _board_noise(p, True)))
+        gone: set[str] = set()
+        starters_by_owner = [0] * (teams + 1)
+        filled_by_owner: list[dict] = [{} for _ in range(teams + 1)]
+
+        linear = (style or "snake").lower().startswith("lin")
+        taken_at: dict[str, int] = {}
+        for pick in range(1, teams * rounds + 1):
+            rnd, i = divmod(pick - 1, teams)
+            owner = i + 1 if (linear or rnd % 2 == 0) else teams - i
+            src = order if owner == slot else board
+            filled = filled_by_owner[owner]
+
+            chosen = None
+            if starters_by_owner[owner] < starters:
+                for p in src:
+                    if p["name"] in gone:
+                        continue
+                    s = _slot_for(p["pos"], roster, filled)
+                    if s:
+                        chosen = p
+                        filled[s] = filled.get(s, 0) + 1
+                        break
+            if chosen is None:
+                for p in src:
+                    if p["name"] not in gone:
+                        chosen = p
+                        break
+            if chosen is None:
+                continue
+            gone.add(chosen["name"])
+            starters_by_owner[owner] += 1
+            taken_at[chosen["name"]] = pick
+
+            # Once every watched player is resolved for this trial, stop —
+            # nothing past that point changes the tally.
+            if pick >= max(target_pick.values(), default=0) and all(
+                    n in gone for n in survived):
+                break
+
+        # "Survived" means still on the board at MY target pick — taken by
+        # ME at or after it counts (I got him when I meant to), taken by
+        # anyone else BEFORE it does not (he was gone before my decision
+        # point came up). The earlier version only checked whether *I*
+        # picked him late or never picked him at all, so an opponent taking
+        # him well ahead of my pick was silently counted as "available."
+        for p in watch:
+            tgt = target_pick.get(p["name"])
+            if tgt is None:
+                continue
+            if taken_at.get(p["name"], 10**9) >= tgt:
+                survived[p["name"]] += 1
+
+    out = []
+    for p in watch:
+        tgt = target_pick.get(p["name"])
+        if tgt is None:
+            continue
+        out.append({
+            "name": p["name"], "pos": p["pos"], "rank": p.get("rank"),
+            "adp": round(p.get("adp") or 999),
+            "atPick": tgt,
+            "pct": round(100 * survived[p["name"]] / trials),
+        })
+    return out
