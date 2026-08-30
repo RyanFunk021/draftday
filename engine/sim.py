@@ -1,11 +1,36 @@
-"""Draft the league, then play the season. Many times.
+"""Draft the league, in real snake order, then play the season. Many times.
 
-Your team drafts from YOUR list. The other teams draft from Yahoo's default
-board (ADP order, small noise), because that is what most people in a real
-league actually do: they never touch the ranking.
+Your team drafts from YOUR list. The field of opponents is split into two
+different kinds of drafter, because a real 14-team Yahoo league is not 13
+identical robots:
 
-Both sides use real autodraft mechanics: fill every starting slot before
-touching the bench, then take best available.
+  * LIVE drafters (roughly half the field): a human at the keyboard, working
+    mostly off ADP with real tendencies — reaching for a favorite a round
+    early, piling onto a positional run once one starts, refusing to touch a
+    kicker or defense until deep in the draft no matter how the board reads.
+    Ported from the original single-league version of this tool
+    (engine.draft.Manager in the sibling rankmydraft project), which modeled
+    this directly rather than approximating it with noise on a static board.
+
+  * AUTODRAFT opponents (the other half): nobody at the keyboard. Yahoo's
+    autopick mechanically walks a DEFAULT prerank (ADP order, kicker and
+    defense pushed to a realistic round) top to bottom, filling each
+    starting slot exactly once and skipping anyone whose slot is already
+    full, then does the same for the bench. No judgment, no reaching, no
+    reacting to a run — just the literal rule this whole tool exists to
+    exploit, run against everyone else's team too.
+
+This replaces an earlier version that ran a single "sort the whole field by
+a jittered ADP number" mechanic for every opponent, live and auto alike. It
+produced a real, measured defect: a kicker with real-world ADP 105 was
+landing at a median opponent pick of 69.5 across 60 trials, because ADP
+labels borrowed from a much larger real player pool collapse to a far
+earlier true rank in this smaller one, and nothing in that mechanic
+distinguished "a human would never do this" from "the math says he might."
+The gate below (LATE_POSITIONS, an outright refusal rather than a soft
+placement heuristic) and the mechanical autodraft walk (which places K/DEF
+by ROUND, never by a jittered value) both exist specifically to make that
+class of error impossible to reintroduce.
 
 Each simulated season adds what season totals hide:
 
@@ -19,20 +44,13 @@ Each simulated season adds what season totals hide:
     in the loop that week.
 
 The fairness check that keeps this honest: hand the simulator Yahoo's own
-default list as "your" list and average across every draft slot — it must
-win about half its games. It does (6.9 of 14 averaged over all 12 slots in
-a 12-team league, within noise of 7.0).
-
-That average hides real per-slot variance, and it should: snake drafts do
-not treat every slot equally. A team at slot 1 gets picks 1 and 24 (a
-23-pick gap), while a team at slot 6 gets 6, 19, 30, 43... (an even ~11-13
-pick gap every round, never a back-to-back pair). Checked with the DEFAULT
-list at every slot, that spacing alone swings the result from about 4.7
-wins at the worst slot to 8.5 at the best — a real, well-documented property
-of snake drafts, not a simulator artifact. So the meaningful comparison is
-never "does this slot land on exactly 7.0" but "does a custom list beat the
-default list AT THE SAME SLOT" — checked across slots 1, 6, 9 and 12, a
-built list beats the same-slot default by +1.3 to +4.8 wins every time.
+default prerank as "your" list and average across every draft slot — it
+must win about half its games. Snake drafts do not treat every slot
+equally (a team at slot 1 gets picks 1 and 24, a 23-pick gap; slot 6 gets
+6, 19, 30, 43..., an even ~11-13 pick gap every round, never a
+back-to-back pair) so the average hides real per-slot variance, and it
+should. The meaningful comparison is never "does this slot land on exactly
+7.0" but "does a custom list beat the default list AT THE SAME SLOT."
 """
 from __future__ import annotations
 
@@ -52,13 +70,85 @@ SEASON_ENDER = 0.12
 STAR_CHANCE = 0.07
 DUD_CHANCE = 0.07
 
-# ADP scatter for the default-list drafters. Zero: they follow the board
-# exactly, which is the premise. Noise makes opponents draft slightly worse
-# than the clean board and flatters every list (at 4.0 the null test came
-# back 7.5 wins instead of 7.0; at 0.0 it is 7.00 on the nose).
-ADP_NOISE = 0.0
-
 MIN_WEEK = {"QB": -3.0, "DEF": -5.0}
+
+# ── live opponents: humans, roughly ──────────────────────────────────────
+#
+# Half the field (see split_live_auto below). Each gets a persistent
+# temperament for the whole draft — the league-mate who always reaches is
+# the same person every round — and picks off a small candidate window
+# around the front of the ADP-scattered board rather than a single "next
+# name up," so need, a run, and a reach all have something to compete over.
+#
+# "Everyone takes the best player left" is what makes a simulated draft
+# smoother than a real one. Real drafts clump for reasons that are well
+# documented and easy to model directly instead of approximating with noise:
+#
+#   1. Positional runs. Two running backs go and the room panics; the next
+#      few picks skew heavily to that position regardless of value.
+#   2. Roster needs. A manager with two quarterbacks does not take a third,
+#      no matter where the board says he ranks.
+#   3. Reaching. Managers take their guy a round early rather than risk it.
+#   4. Nobody drafts a kicker in round 4. LATE_POSITIONS below is an outright
+#      gate, not a soft preference — this is the rule the entire earlier
+#      "board rank" mechanic existed to approximate and got measurably wrong
+#      (a kicker landing at a median pick of 69.5). A live drafter simply
+#      will not take one that early; there is no partial credit for "the
+#      board briefly suggested it."
+
+LIVE_ADP_NOISE_BASE = 6.0
+LIVE_ADP_NOISE_GROWTH = 0.10
+RUN_WINDOW = 6           # picks that count as "recent" for detecting a run
+RUN_STRENGTH = 0.55      # how strongly a run pulls the next pick to that position
+REACH_CHANCE = 0.22      # how often a manager takes someone earlier than value
+REACH_DEPTH = 8          # how far down the board a reach can reach
+CANDIDATE_WINDOW = REACH_DEPTH * 2   # how many names a live drafter even considers
+
+# Fraction of the draft that must elapse before K/DEF are even candidates
+# for a live drafter, full stop — not a penalty, a gate.
+LATE_POSITIONS = {"K": 0.80, "DEF": 0.72}
+
+# Fraction of the draft after which a live drafter still missing a mandatory
+# starter (most often K or DEF, since LATE_POSITIONS holds them back) goes
+# and fills it rather than keep taking best-available. Without this, a
+# manager who never lucked into a kicker inside his usual candidate window
+# finishes the whole draft without one. Matches LATE_POSITIONS["DEF"] — the
+# earliest gated position becomes fair game — rather than sitting near the
+# very end of the whole draft, which left most teams' OWN picks already
+# exhausted before the force-fill could ever trigger for them (measured:
+# 45% of opponent rosters illegal at 0.90; 0% at 0.72).
+FILL_REQUIRED_AFTER = 0.72
+
+
+def _missing_required(have: dict, roster_shape: dict) -> set:
+    """Dedicated starting slots this roster still cannot fill."""
+    return {pos for pos, need in roster_shape.items()
+            if "/" not in pos and have.get(pos, 0) < need}
+
+
+class LiveManager:
+    """One live opponent, with habits that persist across the whole draft."""
+
+    __slots__ = ("reach", "need_weight", "run_chase", "roster", "players")
+
+    def __init__(self, rng: random.Random):
+        # Spread of temperaments: some managers are disciplined, some are not.
+        self.reach = rng.uniform(0.5, 1.6) * REACH_CHANCE
+        self.need_weight = rng.uniform(0.4, 1.5)
+        self.run_chase = rng.uniform(0.3, 1.5)
+        self.roster: dict[str, int] = {}
+        self.players: list[dict] = []
+
+    def wants(self, pos: str, roster_shape: dict) -> float:
+        """How much this manager still needs the position, 0-1ish."""
+        have = self.roster.get(pos, 0)
+        want = roster_shape.get(pos, 0)
+        for slot, n in roster_shape.items():
+            if "/" in slot and pos in slot.upper().split("/"):
+                want += n * 0.5
+        if want <= 0:
+            return 0.15                      # bench flier
+        return max(0.1, 1.0 - have / max(want, 0.5))
 
 
 def pick_numbers(slot: int, teams: int, rounds: int,
@@ -142,46 +232,46 @@ def _default_board(pool: list[dict], teams: int, rounds: int) -> list[dict]:
     return out
 
 
-def _draft(order: list[dict], pool: list[dict], slot: int, teams: int,
-           roster: dict, bench: int, style: str,
-           rng: random.Random,
-           scatter: bool = False) -> tuple[list[dict], list[list[dict]]]:
-    """One draft. Returns (my roster, opponent rosters).
+def split_live_auto(teams: int, my_slot: int, rng: random.Random) -> set[int]:
+    """Which opponent slots (1-indexed, my_slot excluded) draft live this
+    trial. Roughly half, drawn fresh per trial so a season's worth of
+    simulated drafts sees a mix rather than the same 6 seats always being
+    the "engaged" managers."""
+    others = [s for s in range(1, teams + 1) if s != my_slot]
+    rng.shuffle(others)
+    return set(others[: len(others) // 2])
 
-    scatter=False (the season simulation's setting): opponents follow Yahoo's
-    default board exactly — that is the fairness premise the null test
-    checks. The pre-draft tools below pass scatter=True: a "will he survive
-    to my pick" probability against a PERFECTLY static board is either 0% or
-    100% every time, which answers nothing. Real opponents deviate from
-    consensus, so those checks need scatter to produce an actual probability.
+
+def _autodraft_pick(order: list[dict], roster: dict, filled: dict,
+                    starters: int, have: int, gone: set,
+                    wide_pool: list[dict] | None = None) -> dict | None:
+    """One autodraft opponent's pick: walk its OWN prerank top to bottom —
+    starters first, skip full slots, fall through to bench once starters
+    are done. This is Yahoo's actual, literal autopick rule; nothing here
+    reaches, chases a run, or reacts to anything.
+
+    wide_pool: the full player pool, searched only when `order` itself has
+    run dry on someone who fits a still-open slot. A user's own list keeps
+    just a handful of kickers and defenses (engine.rank.KEEP); if every one
+    of them gets drafted by someone else before this team's own turn for
+    that slot comes up, `order` alone has nowhere left to look, and without
+    this the pick would fall through to "best available, any position" and
+    silently double up a skill slot instead — the exact defect a prior
+    session found and fixed (measured at 28% of drafts under plain standard
+    scoring before the fix existed).
     """
-    starters = sum(roster.values())
-    rounds = starters + bench
-    default_order = _default_board(pool, teams, rounds)
-    default_rank = {p["name"]: i for i, p in enumerate(default_order)}
-    board = sorted(pool, key=lambda p: default_rank.get(p["name"], 999)
-                   + rng.gauss(0, _board_noise(default_rank.get(p["name"], 999),
-                                               scatter)))
-
-    linear = (style or "snake").lower().startswith("lin")
-    gone: set[str] = set()
-    mine: list[dict] = []
-    my_filled: dict[str, int] = {}
-    opp: list[list[dict]] = [[] for _ in range(teams)]
-    opp_filled: list[dict] = [{} for _ in range(teams)]
-
-    for pick in range(1, teams * rounds + 1):
-        rnd, i = divmod(pick - 1, teams)
-        owner = i + 1 if (linear or rnd % 2 == 0) else teams - i
-
-        if owner == slot:
-            src, filled, dest = order, my_filled, mine
-        else:
-            src, filled, dest = board, opp_filled[owner - 1], opp[owner - 1]
-
-        chosen = None
-        if len(dest) < starters:                      # starters first
-            for p in src:
+    chosen = None
+    if have < starters:
+        for p in order:
+            if p["name"] in gone:
+                continue
+            s = _slot_for(p["pos"], roster, filled)
+            if s:
+                chosen = p
+                filled[s] = filled.get(s, 0) + 1
+                break
+        if chosen is None and wide_pool is not None:
+            for p in wide_pool:
                 if p["name"] in gone:
                     continue
                 s = _slot_for(p["pos"], roster, filled)
@@ -189,42 +279,163 @@ def _draft(order: list[dict], pool: list[dict], slot: int, teams: int,
                     chosen = p
                     filled[s] = filled.get(s, 0) + 1
                     break
-            # A team's own ranked list can run dry on a scarce position (K
-            # and DEF are ~14 deep leaguewide, and a shortened list only
-            # carries a handful) while that position is still open and
-            # players at it still exist elsewhere in the draft. Widening the
-            # search to the full pool here is what a real draft actually
-            # does — a manager out of kickers on his own cheat sheet still
-            # drafts SOME kicker, he does not draft a third quarterback
-            # instead and call it a starter. Skipping this widen step is
-            # what let a second QB silently fill a missing DEF/K slot and
-            # get counted as a legitimate starter: measured at 28% of
-            # drafts under plain standard scoring before this fix.
-            if chosen is None:
-                for p in board:
-                    if p["name"] in gone:
-                        continue
-                    s = _slot_for(p["pos"], roster, filled)
-                    if s:
-                        chosen = p
-                        filled[s] = filled.get(s, 0) + 1
-                        break
-        if chosen is None:                            # then best available
-            for p in src:
-                if p["name"] not in gone:
-                    chosen = p
-                    break
-        if chosen is None:
-            for p in board:                           # list exhausted
+    if chosen is None:
+        for p in order:
+            if p["name"] not in gone:
+                chosen = p
+                break
+    return chosen
+
+
+def _live_pick(default_order: list[dict], default_rank: dict[str, int],
+              roster: dict, mgr: LiveManager, progress: float,
+              run_recent: list[str], gone: set, rng: random.Random) -> dict | None:
+    """One live opponent's pick: a small candidate window off the front of
+    the (rank-scattered) board, scored by roster need, a positional run, a
+    hard gate on K/DEF until late, and a chance to reach for a favorite.
+    Ported from engine.draft.Manager in the sibling rankmydraft project.
+    """
+    pool_c: list[dict] = []
+    for p in default_order:
+        if p["name"] in gone:
+            continue
+        pool_c.append(p)
+        if len(pool_c) >= CANDIDATE_WINDOW:
+            break
+    if not pool_c:
+        return None
+
+    # Late in the draft, a manager still missing a mandatory starter (almost
+    # always K or DEF, since the gate below holds them back) goes and gets
+    # one, searching the WHOLE remaining board rather than just the
+    # candidate window — a kicker sitting 100 picks down the ADP order is
+    # never a candidate otherwise, and every live opponent would finish the
+    # draft without one, forfeiting the slot all season.
+    if progress >= FILL_REQUIRED_AFTER:
+        need_pos = _missing_required(mgr.roster, roster)
+        if need_pos:
+            forced = next((c for c in default_order
+                          if c["pos"] in need_pos and c["name"] not in gone),
+                         None)
+            if forced:
+                pool_c = [forced]
+
+    best_p, best_score = pool_c[0], -1e9
+    for rank_i, cand in enumerate(pool_c):
+        pos = cand["pos"]
+        score = -rank_i * 1.0              # board order is the baseline
+
+        score += mgr.wants(pos, roster) * 3.0 * mgr.need_weight
+
+        recent = run_recent[-RUN_WINDOW:]
+        if recent:
+            share = recent.count(pos) / len(recent)
+            score += share * RUN_STRENGTH * 6.0 * mgr.run_chase
+
+        # The gate: an outright refusal, not a penalty a big enough score
+        # can outweigh. A live drafter simply does not have a kicker or
+        # defense in his candidate window this early, full stop.
+        gate = LATE_POSITIONS.get(pos)
+        if gate is not None and progress < gate:
+            continue
+
+        if rng.random() < mgr.reach:
+            score += rng.uniform(0, 4.0)
+
+        if score > best_score:
+            best_score, best_p = score, cand
+
+    return best_p
+
+
+def _draft(order: list[dict], pool: list[dict], slot: int, teams: int,
+           roster: dict, bench: int, style: str,
+           rng: random.Random,
+           scatter: bool = False,
+           track_picks: bool = False
+           ) -> tuple[list[dict], list[list[dict]], dict[str, int] | None]:
+    """One draft, in real snake order. Returns (my roster, opponent rosters,
+    taken_at). taken_at maps player name -> the overall pick number he was
+    drafted at, but is only populated when track_picks=True — building it
+    costs nothing extra in the loop, but callers that do not need per-pick
+    timing (the season simulator, run many times per trial) should not pay
+    for a bigger dict than they use.
+
+    scatter=False (the season simulation's setting): every opponent, live or
+    auto, follows their respective mechanic with ZERO extra jitter beyond
+    what each mechanic already models on its own (a live drafter's reach
+    chance, a positional run) — that is the fairness premise the null test
+    checks. scatter=True (the pre-draft tools) additionally jitters the
+    shared ADP board those mechanics read from, since "will he survive to my
+    pick" against a perfectly static board is either 0% or 100% every time.
+    """
+    starters = sum(roster.values())
+    rounds = starters + bench
+    default_order = _default_board(pool, teams, rounds)
+    default_rank = {p["name"]: i for i, p in enumerate(default_order)}
+    if scatter:
+        scattered = sorted(
+            pool, key=lambda p: default_rank.get(p["name"], 999)
+            + rng.gauss(0, _board_noise(default_rank.get(p["name"], 999), True)))
+    else:
+        scattered = default_order
+
+    live_slots = split_live_auto(teams, slot, rng)
+    managers = {s: LiveManager(rng) for s in live_slots}
+    run_recent: list[str] = []
+
+    linear = (style or "snake").lower().startswith("lin")
+    gone: set[str] = set()
+    mine: list[dict] = []
+    my_filled: dict[str, int] = {}
+    opp: list[list[dict]] = [[] for _ in range(teams)]
+    opp_filled: list[dict] = [{} for _ in range(teams)]
+    total_picks = teams * rounds
+    taken_at: dict[str, int] | None = {} if track_picks else None
+
+    for pick in range(1, total_picks + 1):
+        rnd, i = divmod(pick - 1, teams)
+        owner = i + 1 if (linear or rnd % 2 == 0) else teams - i
+        progress = pick / total_picks
+
+        if owner == slot:
+            # My own team: walk MY list, same mechanic as autodraft, since
+            # that is literally what Yahoo does with whatever prerank you
+            # hand it — the entire reason this tool exists is to hand it a
+            # BETTER one.
+            chosen = _autodraft_pick(order, roster, my_filled, starters,
+                                     len(mine), gone, wide_pool=default_order)
+            dest = mine
+        elif owner in managers:
+            chosen = _live_pick(scattered, default_rank, roster,
+                                managers[owner], progress, run_recent,
+                                gone, rng)
+            dest = opp[owner - 1]
+        else:
+            chosen = _autodraft_pick(scattered, roster,
+                                     opp_filled[owner - 1], starters,
+                                     len(opp[owner - 1]), gone)
+            dest = opp[owner - 1]
+
+        if chosen is None:                     # board exhausted this deep
+            for p in scattered:
                 if p["name"] not in gone:
                     chosen = p
                     break
         if chosen is None:
             continue
+
         gone.add(chosen["name"])
         dest.append(chosen)
+        if taken_at is not None:
+            taken_at[chosen["name"]] = pick
+        run_recent.append(chosen["pos"])
+        if owner in managers:
+            mgr = managers[owner]
+            mgr.roster[chosen["pos"]] = mgr.roster.get(chosen["pos"], 0) + 1
+            mgr.players.append(chosen)
 
-    return mine, [r for r in opp if r]
+    return mine, [r for r in opp if r], taken_at
 
 
 def _lineup(team: list[dict], roster: dict, week: int, out: dict,
@@ -314,8 +525,8 @@ def run_raw(order: list[dict], pool: list[dict], slot: int, teams: int,
     my_adds = 0
 
     for t in range(trials):
-        mine, opps = _draft(order, pool, slot, teams, roster, bench,
-                            style, rng)
+        mine, opps, _ = _draft(order, pool, slot, teams, roster, bench,
+                               style, rng)
         if not opps:
             continue
 
@@ -443,8 +654,8 @@ def likely_roster(order: list[dict], pool: list[dict], slot: int, teams: int,
     starters = sum(roster.values())
     drafts = []
     for _ in range(trials):
-        mine, _ = _draft(order, pool, slot, teams, roster, bench, style,
-                         rng, scatter=True)
+        mine, _, _ = _draft(order, pool, slot, teams, roster, bench, style,
+                            rng, scatter=True)
         drafts.append(mine)
 
     totals = sorted(range(len(drafts)),
@@ -526,72 +737,21 @@ def check_availability(order: list[dict], pool: list[dict], slot: int,
                                       else later[0] if later
                                       else my_picks[0] if my_picks else None)
 
+    # Runs the SAME draft mechanic _draft() uses everywhere else (live/auto
+    # opponent split, the hard K/DEF gate, positional runs) instead of a
+    # second, independent implementation of a draft loop. Two copies of this
+    # logic is exactly how the earlier "opponents chase kickers absurdly
+    # early" defect went unnoticed here after it was fixed in _draft() for
+    # the season simulator — this function kept its own separate loop that
+    # never got the same fix.
     for _ in range(trials):
-        board = sorted(pool, key=lambda p: board_rank.get(p["name"], 999)
-                       + rng.gauss(0, _board_noise(
-                           board_rank.get(p["name"], 999), True)))
-        gone: set[str] = set()
-        starters_by_owner = [0] * (teams + 1)
-        filled_by_owner: list[dict] = [{} for _ in range(teams + 1)]
-
-        linear = (style or "snake").lower().startswith("lin")
-        taken_at: dict[str, int] = {}
-        for pick in range(1, teams * rounds + 1):
-            rnd, i = divmod(pick - 1, teams)
-            owner = i + 1 if (linear or rnd % 2 == 0) else teams - i
-            src = order if owner == slot else board
-            filled = filled_by_owner[owner]
-
-            chosen = None
-            if starters_by_owner[owner] < starters:
-                for p in src:
-                    if p["name"] in gone:
-                        continue
-                    s = _slot_for(p["pos"], roster, filled)
-                    if s:
-                        chosen = p
-                        filled[s] = filled.get(s, 0) + 1
-                        break
-                # Same widen-to-full-pool fallback as _draft, and for the
-                # same reason: a team's own ranked list can run dry on a
-                # scarce position (K/DEF) while that position is still open
-                # and players at it still exist in the wider pool. Without
-                # this, a second QB (or whatever's next on the list) could
-                # silently fill a missing K/DEF slot and get counted as a
-                # starter, corrupting the availability odds for anyone
-                # watching that position.
-                if chosen is None and owner == slot:
-                    for p in board:
-                        if p["name"] in gone:
-                            continue
-                        s = _slot_for(p["pos"], roster, filled)
-                        if s:
-                            chosen = p
-                            filled[s] = filled.get(s, 0) + 1
-                            break
-            if chosen is None:
-                for p in src:
-                    if p["name"] not in gone:
-                        chosen = p
-                        break
-            if chosen is None:
-                continue
-            gone.add(chosen["name"])
-            starters_by_owner[owner] += 1
-            taken_at[chosen["name"]] = pick
-
-            # Once every watched player is resolved for this trial, stop —
-            # nothing past that point changes the tally.
-            if pick >= max(target_pick.values(), default=0) and all(
-                    n in gone for n in survived):
-                break
+        _, _, taken_at = _draft(order, pool, slot, teams, roster, bench,
+                                style, rng, scatter=True, track_picks=True)
 
         # "Survived" means still on the board at MY target pick — taken by
         # ME at or after it counts (I got him when I meant to), taken by
         # anyone else BEFORE it does not (he was gone before my decision
-        # point came up). The earlier version only checked whether *I*
-        # picked him late or never picked him at all, so an opponent taking
-        # him well ahead of my pick was silently counted as "available."
+        # point came up).
         for p in watch:
             tgt = target_pick.get(p["name"])
             if tgt is None:
