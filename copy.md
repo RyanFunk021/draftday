@@ -15,23 +15,41 @@ Simulation weighting
 ## weights-hint
 Slide toward projections if you trust this year's outlook more. Slide toward last year if you trust results more. Rookies keep their projection either way — there's nothing to weigh.
 
+## custom-scoring-summary
+Enter custom scoring (HFL, etc.)
+
+## custom-scoring-hint
+Leave anything blank to keep the standard value. Yards per point: how many yards it takes to earn one point (25 is standard for passing). PPR: 0 for no points per catch, 0.5 for half, 1 for full.
+
 ## build-button
-Build my list
+Build my optimized prerank draft list
 
 ## list-heading
 Your list
 
 ## list-hint
-Arrows move a player. Click a row for the full breakdown, news, and to check his draft odds. This exact order is what you download.
+Click a row for the full breakdown and news. The up arrow bumps a player higher and shows the round he'd likely go in and the odds he lasts that long. This exact order is what you download.
 
-## tips-heading
-20 to watch
+## tips-top-heading
+Top picks
 
-## tips-hint
-News-flagged players, and players sitting well past their usual ADP under your league's scoring — worth a look either way.
+## tips-top-hint
+The best available players on your board right now, with real 2026 draft strategy notes where they exist.
+
+## tips-value-heading
+Value and risk
+
+## tips-value-hint
+Real bust warnings and undervalued calls from current draft analysis, for players in your mid-round range.
+
+## tips-deep-heading
+Deep sleepers
+
+## tips-deep-hint
+Late-round upside picks worth a flier or a bench stash for next year, from real draft-strategy coverage.
 
 ## roster-heading
-Your likely starting roster
+Your likely starting roster, including bench
 
 ## roster-hint
 One example draft using this exact list, against eleven teams on Yahoo's default board. Reorder your list above and this updates.
@@ -50,6 +68,9 @@ Each simulated season has injuries, breakouts, busts and waiver moves. Your oppo
 
 ## sim-button
 Simulate the season
+
+## sim-progress
+Playing out {done} of {total} seasons…
 
 ## results-wins
 wins in a typical season
@@ -71,7 +92,7 @@ During the season
 
 ## manage-static
 - Set your lineup every week. Byes and injuries beat forgetfulness more than bad drafting.
-- Check the waiver wire Tuesday night. The players below went undrafted in most simulations.
+- Check the waiver wire Tuesday night. See the "likely available on waivers" note above for names to watch.
 - Never start a player listed Out or Doubtful. A healthy mediocre player beats an injured star.
 - Trade from surplus, not from need.
 

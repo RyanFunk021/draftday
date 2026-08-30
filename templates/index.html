@@ -34,6 +34,29 @@
     </div>
     <div id="roster" class="grid roster"></div>
 
+    <details id="customscoring">
+      <summary>{{ c['custom-scoring-summary'] }}</summary>
+      <p class="hint">{{ c['custom-scoring-hint'] }}</p>
+      <div class="grid scoring">
+        <label>Pass yds/pt <input data-s="pass_yd_per_pt" type="number" step="0.5" placeholder="25"></label>
+        <label>Rush yds/pt <input data-s="rush_yd_per_pt" type="number" step="0.5" placeholder="10"></label>
+        <label>Recv yds/pt <input data-s="recv_yd_per_pt" type="number" step="0.5" placeholder="10"></label>
+        <label>Pass TD <input data-s="pass_td" type="number" step="0.5" placeholder="4"></label>
+        <label>Rush TD <input data-s="rush_td" type="number" step="0.5" placeholder="6"></label>
+        <label>Recv TD <input data-s="recv_td" type="number" step="0.5" placeholder="6"></label>
+        <label>PPR <input data-s="ppr" type="number" step="0.5" min="0" max="1" placeholder="0-1"></label>
+        <label>Interception <input data-s="int_thrown" type="number" step="0.5" placeholder="-2"></label>
+        <label>Fumble lost <input data-s="fumble_lost" type="number" step="0.5" placeholder="-2"></label>
+        <label>FG 0-39 <input data-s="fg_0_39" type="number" step="0.5" placeholder="3"></label>
+        <label>FG 40-49 <input data-s="fg_40_49" type="number" step="0.5" placeholder="4"></label>
+        <label>FG 50+ <input data-s="fg_50" type="number" step="0.5" placeholder="5"></label>
+        <label>PAT <input data-s="pat" type="number" step="0.5" placeholder="1"></label>
+        <label>DST sack <input data-s="dst_sack" type="number" step="0.5" placeholder="1"></label>
+        <label>DST turnover <input data-s="dst_turnover" type="number" step="0.5" placeholder="2"></label>
+        <label>DST TD <input data-s="dst_td" type="number" step="0.5" placeholder="6"></label>
+      </div>
+    </details>
+
     <h2>{{ c['weights-heading'] }}</h2>
     <div class="weights">
       <div class="ends"><b id="lastwv-proj">50</b> projections &middot; last year <b id="lastwv-last">50</b></div>
@@ -52,11 +75,7 @@
   <p class="hint">{{ c['list-hint'] }}</p>
   <div class="cols">
     <div id="board"></div>
-    <aside id="tips">
-      <h3>{{ c['tips-heading'] }}</h3>
-      <p class="hint">{{ c['tips-hint'] }}</p>
-      <ol class="tiplist" id="tiplist"></ol>
-    </aside>
+    <aside id="tips"></aside>
   </div>
 </section>
 
@@ -66,16 +85,14 @@
   <div id="rosterpreview" class="roster-preview"></div>
 </section>
 
-<section id="availwrap" class="card" hidden>
-  <h2>{{ c['avail-heading'] }}</h2>
-  <p class="hint">{{ c['avail-hint'] }}</p>
-  <div id="availlist"></div>
-</section>
-
 <section id="simwrap" class="card" hidden>
   <h2>{{ c['sim-heading'] }}</h2>
   <p class="hint">{{ c['sim-hint'] }}</p>
   <button id="simgo">{{ c['sim-button'] }}</button>
+  <div id="simprogress" hidden>
+    <p id="simprogresstext" class="hint"></p>
+    <div class="progtrack"><div id="progfill" class="progfill"></div></div>
+  </div>
   <span id="simmsg" class="hint"></span>
   <div id="simout" hidden>
     <div class="big"><b id="winnum"></b> {{ c['results-wins'] }}</div>

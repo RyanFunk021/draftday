@@ -230,10 +230,18 @@ def _lineup(team: list[dict], roster: dict, week: int, out: dict,
     return total, adds
 
 
-def run(order: list[dict], pool: list[dict], slot: int, teams: int,
-        roster: dict, bench: int, style: str = "snake",
-        trials: int = 150, seed: int = 7) -> dict:
-    """Seasons for one list. Returns the win distribution and what drove it."""
+def run_raw(order: list[dict], pool: list[dict], slot: int, teams: int,
+           roster: dict, bench: int, style: str = "snake",
+           trials: int = 150, seed: int = 7) -> dict:
+    """Seasons for one list, as raw per-trial lists rather than an aggregate.
+
+    Split out from run() so a caller (the streaming /api/simulate endpoint)
+    can run this in small batches with different seeds and merge the raw
+    lists across batches, animating real progress rather than faking a
+    progress bar around one instant computation — 200 trials of this
+    actually takes under half a second, which reads as broken, not fast,
+    when the button says "simulating."
+    """
     rng = random.Random(seed)
     wins_all: list[int] = []
     pts_all: list[float] = []
@@ -296,10 +304,20 @@ def run(order: list[dict], pool: list[dict], slot: int, teams: int,
         wins_all.append(wins)
         pts_all.append(season_pts)
 
-    if not wins_all:
-        return {}
-    wins_all.sort()
+    return {
+        "wins": wins_all, "points": pts_all,
+        "injuredStarts": injured_starts, "waiverAdds": my_adds,
+    }
+
+
+def summarize(raw: dict) -> dict:
+    """Turn accumulated run_raw() output into the same dict run() used to
+    return directly. Callable on a partial accumulation too, so a streaming
+    endpoint can summarize-so-far after every batch."""
+    wins_all = sorted(raw["wins"])
     n = len(wins_all)
+    if not n:
+        return {}
     return {
         "trials": n,
         "weeks": REGULAR_WEEKS,
@@ -307,10 +325,20 @@ def run(order: list[dict], pool: list[dict], slot: int, teams: int,
         "lowWins": wins_all[n // 10],
         "highWins": wins_all[(9 * n) // 10],
         "dist": {w: wins_all.count(w) for w in sorted(set(wins_all))},
-        "meanPoints": round(statistics.mean(pts_all)),
-        "injuredStartsPerSeason": round(injured_starts / n, 1),
-        "waiverAddsPerSeason": round(my_adds / n, 1),
+        "meanPoints": round(statistics.mean(raw["points"])),
+        "injuredStartsPerSeason": round(raw["injuredStarts"] / n, 1),
+        "waiverAddsPerSeason": round(raw["waiverAdds"] / n, 1),
     }
+
+
+def run(order: list[dict], pool: list[dict], slot: int, teams: int,
+        roster: dict, bench: int, style: str = "snake",
+        trials: int = 150, seed: int = 7) -> dict:
+    """One-shot convenience wrapper around run_raw() + summarize(), for
+    callers (tests, other tools) that just want a final result."""
+    raw = run_raw(order, pool, slot, teams, roster, bench, style,
+                  trials, seed)
+    return summarize(raw)
 
 
 # Scatter used only for the pre-draft tools below (likely_roster,
@@ -332,16 +360,19 @@ AVAILABILITY_TRACK = 40    # how far down your own list to check at all
 def likely_roster(order: list[dict], pool: list[dict], slot: int, teams: int,
                   roster: dict, bench: int, style: str = "snake",
                   trials: int = 25, seed: int = 3) -> list[dict]:
-    """A representative starting roster your list tends to produce, drafted
-    against Yahoo's default board. Fast (no season logic) — meant to run
-    before the season simulation so a user sees what they're about to test.
+    """A representative full roster your list tends to produce (starters AND
+    bench), drafted against Yahoo's default board. Fast (no season logic) —
+    meant to run before the season simulation so a user sees what they're
+    about to test, bench included, not just who starts.
 
     Runs several quick drafts and returns the single one closest to the
-    MEDIAN total points, rather than combining the most-frequent player per
-    slot across drafts — that alternative produces a roster nobody's draft
-    actually assembled (e.g. three real running backs plus a flex-eligible
-    fourth all landing on the "team" at once, because each was independently
-    a frequent RB across different trials).
+    MEDIAN starter points, rather than combining the most-frequent player
+    per slot across drafts — that alternative produces a roster nobody's
+    draft actually assembled (e.g. three real running backs plus a
+    flex-eligible fourth all landing on the "team" at once, because each was
+    independently a frequent RB across different trials). The full drafted
+    roster (not just the starters slice) is what gets returned, so the bench
+    shown is the ACTUAL bench from that one representative draft.
     """
     rng = random.Random(seed)
     starters = sum(roster.values())
@@ -349,21 +380,23 @@ def likely_roster(order: list[dict], pool: list[dict], slot: int, teams: int,
     for _ in range(trials):
         mine, _ = _draft(order, pool, slot, teams, roster, bench, style,
                          rng, scatter=True)
-        drafts.append(mine[:starters])
+        drafts.append(mine)
 
     totals = sorted(range(len(drafts)),
-                    key=lambda i: sum(p["pts"] for p in drafts[i]))
+                    key=lambda i: sum(p["pts"] for p in drafts[i][:starters]))
     median_draft = drafts[totals[len(totals) // 2]]
 
     filled: dict[str, int] = {}
     result = []
-    for p in median_draft:
-        s = _slot_for(p["pos"], roster, filled)
+    for i, p in enumerate(median_draft):
+        s = _slot_for(p["pos"], roster, filled) if i < starters else None
         if s:
             filled[s] = filled.get(s, 0) + 1
-            result.append({**{k: p.get(k) for k in
-                              ("name", "pos", "team", "bye", "pts")},
-                          "slot": s})
+        else:
+            s = "BENCH"
+        result.append({**{k: p.get(k) for k in
+                          ("name", "pos", "team", "bye", "pts")},
+                      "slot": s})
     return result
 
 

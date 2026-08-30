@@ -30,10 +30,14 @@ function cfg() {
   document.querySelectorAll("#roster input").forEach(i => {
     if (+i.value > 0) roster[i.dataset.slot] = +i.value;
   });
+  const scoring = {};
+  document.querySelectorAll("[data-s]").forEach(i => {
+    if (i.value !== "") scoring[i.dataset.s] = +i.value;
+  });
   return {
     teams: +$("[name=teams]").value, slot: +$("[name=slot]").value,
     bench: +$("[name=bench]").value, style: $("[name=style]").value,
-    preset: $("#preset").value, roster,
+    preset: $("#preset").value, roster, scoring,
     last_weight: +$("#lastw").value,
     order: ORDER,
   };
@@ -63,32 +67,56 @@ $("#cfg").addEventListener("submit", async e => {
     renderRosterPreview(d.rosterPreview);
     $("#listwrap").hidden = false;
     $("#rosterwrap").hidden = false;
-    $("#availwrap").hidden = false;
     $("#simwrap").hidden = false;
     $("#simout").hidden = true;
     $("#msg").textContent = "";
-    refreshAvailability();
     $("#listwrap").scrollIntoView({ behavior: "smooth" });
   } catch (err) { $("#msg").textContent = err.message; }
   finally { btn.disabled = false; }
 });
 
+// ── 20 to watch, three real sourced sections ──
 function renderTips(tips) {
-  $("#tiplist").replaceChildren(...tips.map(t => {
-    const li = el("li");
-    const kind = el("span", "kind", t.kind === "news" ? "News" : "Value");
-    li.append(kind, el("b", null, `${t.name} (${t.pos})`),
-              document.createTextNode(" " + t.headline));
-    if (t.url) {
-      const a = el("a"); a.href = t.url; a.target = "_blank";
-      a.rel = "noopener"; a.textContent = "Read more →";
-      li.append(a);
+  const box = $("#tips");
+  box.replaceChildren();
+  const sections = [
+    ["top", "tips-top-heading", "tips-top-hint"],
+    ["value", "tips-value-heading", "tips-value-hint"],
+    ["deep", "tips-deep-heading", "tips-deep-hint"],
+  ];
+  sections.forEach(([key, hKey, hintKey]) => {
+    const entries = (tips && tips[key]) || [];
+    const sec = el("div", "tipsection");
+    sec.append(el("h3", null, COPY[hKey]));
+    sec.append(el("p", "hint", COPY[hintKey]));
+    if (!entries.length) {
+      sec.append(el("p", "tipempty", "Nothing sourced in this range for this league."));
+    } else {
+      const list = el("ol", "tiplist");
+      entries.forEach(t => {
+        const li = el("li");
+        li.append(el("b", null, `${t.name} (${t.pos})`));
+        if (t.note) {
+          li.append(document.createTextNode(" " + t.note));
+          const src = el("span", "src");
+          if (t.url) {
+            const a = el("a"); a.href = t.url; a.target = "_blank";
+            a.rel = "noopener"; a.textContent = t.source;
+            src.append(document.createTextNode("Source: "), a);
+          } else {
+            src.textContent = "Source: " + t.source;
+          }
+          li.append(src);
+        }
+        list.append(li);
+      });
+      sec.append(list);
     }
-    return li;
-  }));
+    box.append(sec);
+  });
 }
 
-// ── list / detail ──
+// ── list / detail / inline round+odds ──
 function renderBoard() {
   const starters = starterCount();
   const board = $("#board");
@@ -103,7 +131,8 @@ function renderBoard() {
     const mv = el("span", "mv");
     const up = el("button", null, "▲"), dn = el("button", null, "▼");
     up.type = "button"; dn.type = "button";
-    up.onclick = ev => { ev.stopPropagation(); move(i, -1); };
+    up.title = "Move up and check his round and odds";
+    up.onclick = ev => { ev.stopPropagation(); bumpUp(i); };
     dn.onclick = ev => { ev.stopPropagation(); move(i, +1); };
     mv.append(up, dn); row.append(mv);
     row.onclick = () => toggleDetail(row, p);
@@ -117,20 +146,65 @@ function starterCount() {
 
 function move(i, d) {
   const j = i + d;
-  if (j < 0 || j >= ORDER.length) return;
+  if (j < 0 || j >= ORDER.length) return null;
   [ORDER[i], ORDER[j]] = [ORDER[j], ORDER[i]];
   renderBoard();
   scheduleReorderRefresh();
+  return j;
 }
 
-// Reordering changes both the likely roster and the availability odds.
-// Debounced so a burst of arrow clicks does not fire a request per click.
+// The up arrow does two things: moves the player, and immediately shows
+// where he'd actually go (round) and the odds he lasts there — the point
+// isn't just reordering, it's seeing whether bumping him up was worth it.
+async function bumpUp(i) {
+  const newIndex = move(i, -1);
+  if (newIndex == null) return;
+  const name = ORDER[newIndex];
+  const row = [...document.querySelectorAll(".row")][newIndex];
+  if (!row) return;
+
+  document.querySelectorAll(".rowodds").forEach(r => r.remove());
+  const odds = el("div", "rowodds loading", "Checking round and odds…");
+  row.after(odds);
+
+  try {
+    const r = await post("/api/availability", cfg());
+    const hit = r.players.find(a => a.name === name);
+    odds.replaceWith(oddsRow(hit, +$("[name=teams]").value));
+  } catch {
+    odds.textContent = "Couldn't check right now.";
+    odds.classList.remove("loading");
+  }
+}
+
+function oddsRow(hit, teams) {
+  const row = el("div", "rowodds");
+  if (!hit) {
+    row.textContent = "Outside your top targets — likely a very late or very safe pick.";
+    return row;
+  }
+  const round = Math.floor((hit.atPick - 1) / teams) + 1;
+  const rnd = el("span", "rnd");
+  rnd.innerHTML = `Round <b>${round}</b> (pick ${hit.atPick}) &middot; usual ADP ${hit.adp}`;
+  const bar = el("span", "oddsbar " + bandFor(hit.pct));
+  const i = el("i"); i.style.width = hit.pct + "%"; bar.append(i);
+  const pct = el("span", "pct", hit.pct + "% lasts that long");
+  row.append(rnd, bar, pct);
+  return row;
+}
+
+function bandFor(pct) {
+  if (pct >= 60) return "";
+  if (pct >= 25) return "risky";
+  return "long";
+}
+
+// Reordering changes both the likely roster and (if a detail panel with
+// odds is open) the availability odds. Debounced so a burst of arrow
+// clicks does not fire a request per click.
 function scheduleReorderRefresh() {
   clearTimeout(reorderTimer);
-  reorderTimer = setTimeout(() => {
-    refreshRosterPreview();
-    refreshAvailability();
-  }, 500);
+  reorderTimer = setTimeout(refreshRosterPreview, 500);
 }
 
 function toggleDetail(row, p) {
@@ -177,34 +251,10 @@ function buildDetail(p) {
     d.append(n);
   }
 
-  const avail = el("div", "avail");
-  const btn = el("button", "ghost", "Check draft odds for this player");
-  btn.type = "button";
-  btn.onclick = async () => {
-    btn.disabled = true; btn.textContent = "Checking…";
-    try {
-      const r = await post("/api/availability", cfg());
-      const hit = r.players.find(a => a.name === p.name);
-      btn.replaceWith(availSummary(hit));
-    } catch (e) {
-      btn.textContent = "Check draft odds for this player";
-      btn.disabled = false;
-    }
-  };
-  avail.append(btn);
-  d.append(avail);
-
   return d;
 }
 
-function availSummary(hit) {
-  if (!hit) return el("p", "hint", "Not tracked — outside your top targets.");
-  const p = el("p", "hint");
-  p.innerHTML = `At pick <b>${hit.atPick}</b> (usual ADP ${hit.adp}), he lasts that long in <b>${hit.pct}%</b> of drafts.`;
-  return p;
-}
-
-// ── roster preview ──
+// ── roster preview, including bench ──
 function renderRosterPreview(roster) {
   const box = $("#rosterpreview");
   box.replaceChildren();
@@ -213,7 +263,7 @@ function renderRosterPreview(roster) {
     return;
   }
   roster.forEach(p => {
-    const slot = el("div", "slot");
+    const slot = el("div", "slot" + (p.slot === "BENCH" ? " bench" : ""));
     slot.append(el("div", "lbl", p.slot));
     const nm = el("div", "nm");
     nm.append(document.createTextNode(`${p.name} (${p.pos})`),
@@ -230,75 +280,92 @@ async function refreshRosterPreview() {
   } catch { /* the build already validated the league; a transient failure here is not worth surfacing */ }
 }
 
-// ── availability ──
-function bandFor(pct) {
-  if (pct >= 60) return "";
-  if (pct >= 25) return "risky";
-  return "long";
-}
+// ── season simulation, streamed and paced to feel like the real work it is ──
+const SIM_SECONDS = 5;
 
-function renderAvailability(players) {
-  const box = $("#availlist");
-  box.replaceChildren();
-  if (!players || !players.length) {
-    box.append(el("p", "availmsg", "No contested picks in range yet."));
-    return;
-  }
-  players.forEach(a => {
-    const row = el("div", "availrow");
-    const nm = el("span", "nm");
-    nm.append(el("span", "pos", a.pos), document.createTextNode(a.name));
-    const meta = el("span", "meta", `pick ${a.atPick} · ADP ${a.adp}`);
-    const bar = el("span", "availbar " + bandFor(a.pct));
-    const i = el("i"); i.style.width = a.pct + "%"; bar.append(i);
-    const pct = el("span", "pct", a.pct + "%");
-    row.append(nm, meta, bar, pct);
-    box.append(row);
-  });
-}
-
-async function refreshAvailability() {
-  try {
-    const d = await post("/api/availability", cfg());
-    renderAvailability(d.players);
-  } catch { /* stale odds beat a broken panel; leave the last good render */ }
-}
-
-// ── season simulation ──
 $("#simgo").addEventListener("click", async () => {
   const btn = $("#simgo");
-  btn.disabled = true; $("#simmsg").textContent = "Playing seasons…";
+  btn.disabled = true;
+  $("#simmsg").textContent = "";
+  $("#simout").hidden = true;
+  const prog = $("#simprogress"); prog.hidden = false;
+  const text = $("#simprogresstext"); const fill = $("#progfill");
+  fill.style.width = "0%";
+
+  const started = performance.now();
+  let last = null;
+
   try {
-    const d = await post("/api/simulate", cfg());
-    $("#winnum").textContent = d.meanWins;
-    $("#winrange").textContent = COPY["results-range"]
-      .replace("{low}", d.lowWins).replace("{high}", d.highWins)
-      .replace("{weeks}", d.weeks);
-    const bars = $("#winbars"); bars.replaceChildren();
-    const max = Math.max(...Object.values(d.dist));
-    for (let w = 0; w <= d.weeks; w++) {
-      const n = d.dist[w] || 0;
-      const b = el("div"); b.style.height = (100 * n / max) + "%";
-      b.append(el("span", null, w));
-      bars.append(b);
-    }
-    $("#simfacts").replaceChildren(
-      el("li", null, COPY["results-points"].replace("{points}", d.meanPoints.toLocaleString())),
-      el("li", null, COPY["results-injuries"].replace("{n}", d.injuredStartsPerSeason)),
-      el("li", null, COPY["results-waivers"].replace("{n}", d.waiverAddsPerSeason)),
-    );
-    const manage = $("#managelist"); manage.replaceChildren();
-    (d.tips || []).forEach(t => manage.append(el("li", null, t)));
-    COPY["manage-static"].split("\n").forEach(line => {
-      line = line.replace(/^- /, "").trim();
-      if (line) manage.append(el("li", null, line));
+    const res = await fetch("/api/simulate", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(cfg()),
     });
-    $("#simout").hidden = false;
-    $("#simmsg").textContent = "";
-    $("#simout").scrollIntoView({ behavior: "smooth" });
-  } catch (err) { $("#simmsg").textContent = err.message; }
-  finally { btn.disabled = false; }
+    if (!res.ok || !res.body) throw new Error("Something went wrong.");
+
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      buf += dec.decode(chunk.value, { stream: true });
+      const lines = buf.split("\n");
+      buf = lines.pop();
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const d = JSON.parse(line);
+        last = d;
+        text.textContent = COPY["sim-progress"]
+          .replace("{done}", d.done).replace("{total}", d.total);
+        // Pace to SIM_SECONDS total, based on progress rather than frame
+        // count, so it lands on time regardless of how fast the server is —
+        // 200 real simulations finish in well under a second on their own,
+        // which reads as broken (not fast) for a button that says
+        // "simulating your season."
+        const target = started + SIM_SECONDS * 1000 * (d.done / d.total);
+        fill.style.width = (100 * d.done / d.total) + "%";
+        const wait = target - performance.now();
+        if (wait > 0) await new Promise(r => setTimeout(r, wait));
+        else fill.style.width = (100 * d.done / d.total) + "%";
+      }
+    }
+    if (!last || last.error) throw new Error(last?.error || "Simulation failed.");
+    finishSim(last);
+  } catch (err) {
+    $("#simmsg").textContent = err.message;
+  } finally {
+    prog.hidden = true;
+    btn.disabled = false;
+  }
 });
+
+function finishSim(d) {
+  $("#winnum").textContent = d.meanWins;
+  $("#winrange").textContent = COPY["results-range"]
+    .replace("{low}", d.lowWins).replace("{high}", d.highWins)
+    .replace("{weeks}", d.weeks);
+  const bars = $("#winbars"); bars.replaceChildren();
+  const max = Math.max(...Object.values(d.dist));
+  for (let w = 0; w <= d.weeks; w++) {
+    const n = d.dist[w] || 0;
+    const b = el("div"); b.style.height = (100 * n / max) + "%";
+    b.append(el("span", null, w));
+    bars.append(b);
+  }
+  $("#simfacts").replaceChildren(
+    el("li", null, COPY["results-points"].replace("{points}", d.meanPoints.toLocaleString())),
+    el("li", null, COPY["results-injuries"].replace("{n}", d.injuredStartsPerSeason)),
+    el("li", null, COPY["results-waivers"].replace("{n}", d.waiverAddsPerSeason)),
+  );
+  const manage = $("#managelist"); manage.replaceChildren();
+  (d.tips || []).forEach(t => manage.append(el("li", null, t)));
+  COPY["manage-static"].split("\n").forEach(line => {
+    line = line.replace(/^- /, "").trim();
+    if (line) manage.append(el("li", null, line));
+  });
+  $("#simout").hidden = false;
+  $("#simout").scrollIntoView({ behavior: "smooth" });
+}
 
 $("#dl").addEventListener("click", async () => {
   const r = await fetch("/api/export", { method: "POST",

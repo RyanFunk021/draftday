@@ -18,6 +18,7 @@ from engine.blend import load_pool
 from engine.rank import build_list
 from engine import sim as sim_mod
 from engine import news as news_mod
+from engine.draft_tips import DRAFT_TIPS
 
 app = Flask(__name__)
 ROOT = Path(__file__).resolve().parent
@@ -128,56 +129,102 @@ def build():
     })
 
 
-def _draft_tips(order: list[dict], L: dict) -> list[dict]:
-    """20 players worth a look before you draft.
+def _draft_tips(order: list[dict], L: dict) -> dict:
+    """Three sections of players worth a look before you draft.
 
-    Two kinds, both computed from real signals rather than written text:
+    These are REAL draft-strategy notes (sleeper calls, bust warnings, value
+    picks) hand-collected from actual 2026 fantasy analysis via live web
+    search — see data/draft_tips.py for the full sourcing note and every
+    article URL. This is deliberately NOT the same thing as the per-player
+    ESPN news attached elsewhere on the page (injuries, transactions): that
+    is real-time team news, this is draft-day strategy content, and they
+    answer different questions.
 
-      * news — best-ranked players with a direct ESPN headline this week
-      * value — players sitting well past their ADP on THIS list, i.e. this
-        league's scoring rates them below the market's consensus price, so
-        they're a plausible late add or a player to not reach for
+    Sections, by where a player actually lands on THIS list:
+      * top      — your highest-ranked players; a "top12" strategy note from
+                   a real article if one exists for him, otherwise none
+      * value    — mid-list players with a real bust warning or undervalued
+                   call attached (this is where nearly all of that content
+                   naturally lands: warnings matter most for players people
+                   are actually paying up for)
+      * deep     — late-list players with a real sleeper call attached
+
+    A rank band with no sourced players in it is returned empty rather than
+    padded with unrelated players — 8 real deep sleepers beats 20 with 12
+    made up to hit a round number.
     """
-    news_tips = []
-    for p in order:
-        direct = next((a for a in p.get("news") or [] if a.get("direct")),
-                      None)
-        if direct:
-            news_tips.append({"kind": "news", "name": p["name"],
-                              "pos": p["pos"], "headline": direct["headline"],
-                              "url": direct["url"]})
-        if len(news_tips) >= 12:
-            break
-
+    rank_of = {p["name"]: p["rank"] for p in order}
+    pos_of = {p["name"]: p["pos"] for p in order}
     starters = sum(L["roster"].values())
-    value_tips = []
-    for p in order[:starters * L["teams"]]:
-        adp = p.get("adp") or 999
-        gap = adp - p["rank"]
-        if gap >= 15:      # ranked well ahead of where the market drafts him
-            value_tips.append({"kind": "value", "name": p["name"],
-                               "pos": p["pos"],
-                               "headline": f"Ranked {p['rank']} here, usual "
-                                          f"ADP {round(adp)} — a market gap "
-                                          f"in your league's scoring.",
-                               "url": None})
-    value_tips.sort(key=lambda t: t["name"])
+    depth = starters * L["teams"]
 
-    out = news_tips[:12]
-    remaining = 20 - len(out)
-    out += value_tips[:remaining]
-    return out[:20]
+    def entry(t):
+        return {"name": t["name"], "pos": pos_of.get(t["name"], "?"),
+                "rank": rank_of.get(t["name"]), "note": t["note"],
+                "source": t["source"], "url": t["url"]}
+
+    top, value, deep = [], [], []
+    for t in DRAFT_TIPS:
+        r = rank_of.get(t["name"])
+        if r is None:
+            continue          # this league's blend/scoring dropped him, or
+                              # he's not in the projection pool at all
+        if t["kind"] == "top12" and r <= 20:
+            top.append(entry(t))
+        elif t["kind"] in ("bust", "undervalued"):
+            value.append(entry(t))
+        elif t["kind"] == "sleeper":
+            deep.append(entry(t))
+
+    top.sort(key=lambda e: e["rank"])
+    value.sort(key=lambda e: e["rank"])
+    deep.sort(key=lambda e: e["rank"])
+
+    # Fill out "top" with plain best-available (no sourced note) up to 20,
+    # since only ~11 players will ever have a real top-12 strategy note —
+    # the section is "your top 20," the note is a bonus when one exists.
+    have = {e["name"] for e in top}
+    for p in order[:20]:
+        if p["name"] not in have:
+            top.append({"name": p["name"], "pos": p["pos"], "rank": p["rank"],
+                        "note": None, "source": None, "url": None})
+    top.sort(key=lambda e: e["rank"])
+
+    return {"top": top[:20], "value": value[:20], "deep": deep[:20]}
 
 
 def _pool_too_shallow(pool: list[dict], L: dict) -> str | None:
     """A league the pool cannot fill would produce numbers that measure the
-    data, not the roster. Returns an error string, or None if fine."""
+    data, not the roster. Returns an error string, or None if fine.
+
+    Two separate ways a pool can be too shallow, and both matter:
+
+      1. Not enough of ONE position for every team's starting slot (e.g. a
+         superflex league needing 24 QBs from a 20-QB pool). Checked first.
+      2. Not enough players in TOTAL to fill every team's full roster,
+         starters plus bench. A 14-team league with a 7-man bench needs
+         14 * (9 + 7) = 224 draft slots; this pool has 186 players. Before
+         this check existed, the draft loop would simply run out of players
+         partway through and silently skip the remaining picks — every
+         team's roster (including "yours") came back short, with whole
+         position groups like DEF or WR/RB/TE flex missing entirely, and
+         nothing in the response said why.
+    """
     have: dict[str, int] = {}
     for p in pool:
         have[p["pos"]] = have.get(p["pos"], 0) + 1
     for pos, need in L["roster"].items():
         if "/" not in pos and have.get(pos, 0) < need * L["teams"]:
             return f"Not enough {pos}s in the player pool for {L['teams']} teams."
+
+    starters = sum(n for pos, n in L["roster"].items())
+    needed = L["teams"] * (starters + L["bench"])
+    if len(pool) < needed:
+        return (f"This league needs {needed} drafted players "
+                f"({L['teams']} teams x {starters + L['bench']} roster "
+                f"spots) and the player pool only has {len(pool)}. Lower "
+                f"the bench size or team count, or this league is too deep "
+                f"for the data behind this tool.")
     return None
 
 
@@ -190,6 +237,14 @@ def _order_from(payload: dict, pool: list[dict], L: dict) -> list[dict]:
 
 @app.route("/api/simulate", methods=["POST"])
 def simulate():
+    """Streams NDJSON progress frames while the season simulation runs.
+
+    200 trials of the actual computation finishes in well under a second,
+    which reads as broken rather than fast when the button says "simulating
+    your season" and the number just appears. Split into batches so the
+    client can show real, incrementally-accumulating progress (not a fake
+    timed progress bar) and pace it to feel like the real work it is.
+    """
     payload = request.get_json(force=True, silent=True) or {}
     L = league_from(payload)
     pool = load_pool(L["scoring"], L["last_weight"])
@@ -199,14 +254,39 @@ def simulate():
     if err:
         return jsonify({"error": err}), 400
 
-    trials = int(os.environ.get("DD_TRIALS", 150))
-    result = sim_mod.run(order, pool, L["slot"], L["teams"], L["roster"],
-                         L["bench"], L["style"], trials=trials)
-    if not result:
-        return jsonify({"error": "Simulation failed."}), 500
+    total = int(os.environ.get("DD_TRIALS", 200))
+    batches = 20
+    per = max(1, total // batches)
 
-    result["tips"] = _season_tips(order, pool, L)
-    return jsonify(result)
+    def gen():
+        acc = {"wins": [], "points": [], "injuredStarts": 0, "waiverAdds": 0}
+        done = 0
+        frame = 0
+        while done < total:
+            n = min(per, total - done)
+            frame += 1
+            raw = sim_mod.run_raw(order, pool, L["slot"], L["teams"],
+                                  L["roster"], L["bench"], L["style"],
+                                  trials=n, seed=4000 + frame)
+            acc["wins"] += raw["wins"]
+            acc["points"] += raw["points"]
+            acc["injuredStarts"] += raw["injuredStarts"]
+            acc["waiverAdds"] += raw["waiverAdds"]
+            done += n
+
+            frame_out = {"done": done, "total": total}
+            if done >= total:
+                summary = sim_mod.summarize(acc)
+                if not summary:
+                    frame_out["error"] = "Simulation failed."
+                else:
+                    summary["tips"] = _season_tips(order, pool, L)
+                    frame_out.update(summary)
+            yield json.dumps(frame_out) + "\n"
+
+    return Response(gen(), mimetype="application/x-ndjson",
+                    headers={"Cache-Control": "no-cache",
+                             "X-Accel-Buffering": "no"})
 
 
 @app.route("/api/roster-preview", methods=["POST"])

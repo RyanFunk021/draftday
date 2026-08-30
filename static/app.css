@@ -29,6 +29,19 @@ input:focus, select:focus, button:focus { outline: 2px solid var(--accent); outl
 select { width: auto; }
 .roster input { width: 58px; }
 
+details#customscoring {
+  margin: 10px 0; padding: 10px 12px; background: var(--card2);
+  border: 1px solid var(--line); border-radius: 7px;
+}
+details#customscoring summary {
+  cursor: pointer; font-size: 13px; font-weight: 600; color: var(--ink);
+  list-style: none;
+}
+details#customscoring summary::before { content: "▸ "; color: var(--muted); }
+details#customscoring[open] summary::before { content: "▾ "; }
+.grid.scoring input { width: 74px; }
+.grid.scoring label { font-size: 11px; }
+
 .weights { margin: 10px 0 2px; }
 .weights .ends { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
 .weights .ends b { color: var(--ink); }
@@ -46,14 +59,18 @@ button.ghost:hover { border-color: var(--accent); color: var(--accent); }
 
 .cols { display: flex; gap: 24px; align-items: flex-start; }
 #board { flex: 1.6; min-width: 0; }
-#tips { flex: 1; border-left: 1px solid var(--line); padding-left: 18px; }
-.tiplist { padding-left: 0; list-style: none; font-size: 13px; }
+#tips { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 18px; }
+
+.tipsection { border-left: 1px solid var(--line); padding-left: 18px; }
+.tipsection h3 { margin: 0 0 2px; }
+.tiplist { padding-left: 0; list-style: none; font-size: 13px; margin-top: 8px; }
 .tiplist li { margin: 9px 0; color: var(--muted); padding-bottom: 9px; border-bottom: 1px solid var(--line); }
 .tiplist li:last-child { border-bottom: none; }
 .tiplist b { color: var(--ink); }
-.tiplist .kind { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .04em;
-  text-transform: uppercase; color: var(--accent); margin-right: 6px; }
-.tiplist a { display: block; margin-top: 2px; font-size: 12px; }
+.tiplist .src { display: block; margin-top: 3px; font-size: 11px; }
+.tiplist .src a { color: var(--muted); text-decoration: underline; }
+.tiplist .src a:hover { color: var(--accent); }
+.tipempty { font-size: 12.5px; color: var(--dim); font-style: italic; }
 
 .row {
   display: flex; align-items: center; gap: 8px; padding: 6px 6px; cursor: pointer;
@@ -71,6 +88,21 @@ button.ghost:hover { border-color: var(--accent); color: var(--accent); }
   background: var(--card2); color: var(--muted); border: 1px solid var(--line);
 }
 .row .mv button:hover { color: var(--ink); border-color: var(--accent); }
+
+.rowodds {
+  padding: 6px 6px 8px 42px; font-size: 11.5px; color: var(--muted);
+  border-bottom: 1px solid var(--line); background: var(--card2);
+  display: flex; align-items: center; gap: 8px;
+}
+.rowodds .rnd { flex: 0 0 auto; white-space: nowrap; }
+.rowodds .rnd b { color: var(--ink); }
+.rowodds .oddsbar { flex: 1; max-width: 140px; height: 6px; background: var(--bg);
+  border-radius: 3px; overflow: hidden; border: 1px solid var(--line); }
+.rowodds .oddsbar i { display: block; height: 100%; background: var(--accent); }
+.rowodds .oddsbar.risky i { background: var(--warn); }
+.rowodds .oddsbar.long i { background: var(--bad); }
+.rowodds .pct { flex: 0 0 auto; font-variant-numeric: tabular-nums; font-weight: 600; }
+.rowodds.loading { font-style: italic; }
 
 .detail { padding: 10px 14px 14px 60px; font-size: 12.5px; color: var(--muted);
   border-bottom: 1px solid var(--line); background: var(--card2); }
@@ -94,6 +126,12 @@ button.ghost:hover { border-color: var(--accent); color: var(--accent); }
 .roster-preview .slot .nm { font-size: 13.5px; margin-top: 2px; }
 .roster-preview .slot.empty .nm { color: var(--bad); }
 
+#simprogress { margin-top: 12px; }
+.progtrack { height: 8px; background: var(--card2); border: 1px solid var(--line);
+  border-radius: 4px; overflow: hidden; margin-top: 6px; max-width: 420px; }
+.progfill { height: 100%; width: 0%; background: var(--accent);
+  transition: width .15s linear; }
+
 .big { font-size: 17px; margin: 14px 0 8px; }
 .big b { font-size: 34px; color: var(--accent); }
 #winbars { display: flex; align-items: flex-end; gap: 3px; height: 70px; max-width: 420px; margin: 6px 0 22px; }
@@ -112,18 +150,6 @@ footer { margin-top: 22px; }
 /* roster preview */
 .roster-preview .slot .nm { font-weight: 600; }
 .roster-preview .slot .pts { display: block; font-size: 11px; color: var(--muted); font-weight: 400; margin-top: 1px; }
-
-/* availability check */
-.availrow { display: flex; align-items: center; gap: 10px; padding: 6px 2px; font-size: 13px; }
-.availrow .nm { flex: 0 0 190px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.availrow .nm .pos { color: var(--muted); font-size: 11px; margin-right: 5px; }
-.availrow .meta { flex: 0 0 130px; color: var(--muted); font-size: 11.5px; }
-.availbar { flex: 1; height: 8px; background: var(--card2); border-radius: 4px; overflow: hidden; border: 1px solid var(--line); }
-.availbar i { display: block; height: 100%; background: var(--accent); }
-.availbar.risky i { background: var(--warn); }
-.availbar.long i { background: var(--bad); }
-.availrow .pct { flex: 0 0 42px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
-.availmsg { font-size: 13px; color: var(--muted); }
 
 @media (max-width: 760px) {
   .cols { flex-direction: column; }
