@@ -6,6 +6,8 @@ const el = (t, cls, txt) => {
   return n;
 };
 
+const BOARD_VISIBLE_CAP = 200;
+
 const SLOTS = ["QB", "RB", "WR", "TE", "WR/RB/TE", "K", "DEF"];
 const DEFAULTS = { QB: 1, RB: 2, WR: 2, TE: 1, "WR/RB/TE": 1, K: 1, DEF: 1 };
 SLOTS.forEach(s => {
@@ -157,6 +159,12 @@ function applyBuild(d) {
   renderBoard();
   renderTips(d.tips);
   renderRosterPreview(d.rosterPreview);
+  // A fresh build is a fresh optimal ranking — any manual reorder from
+  // before is already gone (the server never reads a submitted order on
+  // /api/build). Clear the leftover search box and its results too, so
+  // nothing from before the rebuild is still sitting on screen.
+  $("#searchbox").value = "";
+  $("#searchresults").replaceChildren();
 }
 
 // ── search and add a player not on the pool ──
@@ -262,7 +270,8 @@ function renderBoard() {
   const starters = starterCount();
   const board = $("#board");
   board.replaceChildren();
-  ORDER.forEach((name, i) => {
+  const visible = ORDER.slice(0, BOARD_VISIBLE_CAP);
+  visible.forEach((name, i) => {
     const p = PLAYERS[name];
     const row = el("div", "row" + (i < starters ? " starter" : ""));
     row.draggable = true;
@@ -283,6 +292,13 @@ function renderBoard() {
     wireDrag(row);
     board.append(row);
   });
+  const hidden = ORDER.length - visible.length;
+  if (hidden > 0) {
+    board.append(el("div", "boardmore",
+      `+ ${hidden} more ranked players in your pool, held back to keep this list scannable. ` +
+      `Search for one by name above to pull him in, or he'll show up automatically in your ` +
+      `roster preview and season sim if your list runs that deep.`));
+  }
 }
 
 function starterCount() {
