@@ -84,20 +84,62 @@ def _slot_for(pos: str, roster: dict, filled: dict) -> str | None:
     return None
 
 
-def _board_noise(p: dict, scale: bool) -> float:
-    """Standard deviation of one player's scatter off his ADP.
+def _board_noise(rank: float, scale: bool) -> float:
+    """Standard deviation of one player's scatter off his BOARD RANK (his
+    position once _default_board below has placed him, not his raw ADP
+    number).
 
-    Flat noise is wrong here: a fixed +/-5 is nothing at ADP 150, where
-    consensus is thin anyway, but it is enormous at ADP 1-5, where real
+    Flat noise is wrong here: a fixed +/-5 is nothing at rank 150, where
+    consensus is thin anyway, but it is enormous at rank 1-5, where real
     drafts are extremely locked in (the gap between the #1 and #6 overall
-    picks is only 5 spots). Scaling with ADP means the very top of the board
-    stays close to a lock while the scatter that makes the mid-to-late board
-    interesting is preserved.
+    picks is only 5 spots). Scaling with RANK means the very top of the
+    board stays close to a lock while the scatter that makes the
+    mid-to-late board interesting is preserved.
     """
     if not scale:
         return 0.0
-    adp = p.get("adp") or 999.0
-    return AVAILABILITY_NOISE_BASE + AVAILABILITY_NOISE_GROWTH * adp
+    return AVAILABILITY_NOISE_BASE + AVAILABILITY_NOISE_GROWTH * rank
+
+
+# How opponents place K/DEF, mirrored from engine.rank.build_list: fixed
+# fraction of the way through the draft, not sorted by raw ADP value.
+#
+# The bug this exists to fix: this pool is ~186 players deep, and a K's ADP
+# label (e.g. 105) is real-world data borrowed from drafts with hundreds of
+# skill players below it. In THIS pool only ~68 skill players have a lower
+# ADP, so sorting straight by ADP value collapses "ADP 105" down to true
+# rank 70 — round 5 of a 14-team draft. No real drafter, autopick included,
+# takes a kicker in round 5. Measured: with a raw ADP sort, opponents drafted
+# a kicker at a median of pick 69.5 across 60 trials, against a real-world
+# floor around pick 190+. Round-fraction placement is what keeps this from
+# happening to the USER's own list (engine.rank.TARGET_ROUND_FRAC); the
+# opponent board needs the identical protection, since it is standing in for
+# "what would autodraft do with a normal list," and a normal list does not
+# rank a kicker 70th either.
+_BOARD_ROUND_FRAC = {"K": 0.80, "DEF": 0.87}
+
+
+def _default_board(pool: list[dict], teams: int, rounds: int) -> list[dict]:
+    """Zero-noise draft order opponents scatter around: ADP order for skill
+    positions, K/DEF pushed to a fixed fraction of the draft regardless of
+    their raw ADP value. Every K/DEF in the pool is kept (not just a
+    handful) — up to `teams` opponents each need one, so trimming the way
+    engine.rank.build_list does for a single team's list would starve the
+    field."""
+    skill = [p for p in pool if p["pos"] not in _BOARD_ROUND_FRAC]
+    skill.sort(key=lambda p: p.get("adp") or 999)
+    out = list(skill)
+
+    for pos, frac in _BOARD_ROUND_FRAC.items():
+        group = sorted([p for p in pool if p["pos"] == pos],
+                       key=lambda p: p.get("adp") or 999)
+        if not group:
+            continue
+        target = min(int(rounds * frac * teams), len(out))
+        for i, p in enumerate(group):
+            out.insert(min(target + i, len(out)), p)
+
+    return out
 
 
 def _draft(order: list[dict], pool: list[dict], slot: int, teams: int,
@@ -115,8 +157,11 @@ def _draft(order: list[dict], pool: list[dict], slot: int, teams: int,
     """
     starters = sum(roster.values())
     rounds = starters + bench
-    board = sorted(pool, key=lambda p: (p.get("adp") or 999)
-                   + rng.gauss(0, _board_noise(p, scatter)))
+    default_order = _default_board(pool, teams, rounds)
+    default_rank = {p["name"]: i for i, p in enumerate(default_order)}
+    board = sorted(pool, key=lambda p: default_rank.get(p["name"], 999)
+                   + rng.gauss(0, _board_noise(default_rank.get(p["name"], 999),
+                                               scatter)))
 
     linear = (style or "snake").lower().startswith("lin")
     gone: set[str] = set()
@@ -440,28 +485,37 @@ def check_availability(order: list[dict], pool: list[dict], slot: int,
     watch = order[:AVAILABILITY_TRACK]
     survived: dict[str, int] = {p["name"]: 0 for p in watch}
 
+    # Board rank, not raw ADP, for the same reason _draft() uses it: a K/DEF's
+    # ADP number is real-world data that does not describe where he actually
+    # sits in THIS pool (see _default_board's docstring — ADP 105 collapsing
+    # to true rank 70 in a 186-player pool is not a corner case, it happens
+    # to every kicker and defense here).
+    default_order = _default_board(pool, teams, rounds)
+    board_rank = {p["name"]: i for i, p in enumerate(default_order)}
+
     # Which of MY picks is the real decision point for each player.
     #
-    # Two ways to get this wrong, both by only looking at picks AFTER his ADP:
-    #   1. A player with ADP 3, for someone drafting slot 1: the first of my
+    # Two ways to get this wrong, both by only looking at picks AFTER his
+    # board rank:
+    #   1. A player ranked 3rd, for someone drafting slot 1: the first of my
     #      picks at or after 3 is pick 24, which comes back 0% available —
     #      true and useless, since the real decision was pick 1, where he is
     #      a lock.
-    #   2. A player with ADP 21, when my picks are [6, 19, 30, ...]: pick 19
-    #      is BEFORE his ADP and well within reach, but "first of my picks
-    #      >= adp" skips straight past it to pick 30 — by which point he is
+    #   2. A player ranked 21st, when my picks are [6, 19, 30, ...]: pick 19
+    #      is BEFORE his rank and well within reach, but "first of my picks
+    #      >= rank" skips straight past it to pick 30 — by which point he is
     #      almost always long gone — and reports him as 100% available at a
     #      pick where he never actually shows up.
     #
     # The fix is the same for both: take the EARLIEST of my picks that falls
-    # within his plausible range (adp +/- 2 standard deviations), and only
+    # within his plausible range (rank +/- 2 standard deviations), and only
     # fall back to "my pick right before his window opens" if none of my
     # picks land inside it at all.
     target_pick: dict[str, int] = {}
     for p in watch:
-        adp = p.get("adp") or 999.0
-        spread = 2.0 * _board_noise(p, True)
-        lo, hi = adp - spread, adp + spread
+        r = board_rank.get(p["name"], 999)
+        spread = 2.0 * _board_noise(r, True)
+        lo, hi = r - spread, r + spread
         in_range = [k for k in my_picks if lo <= k <= hi]
         if in_range:
             target_pick[p["name"]] = in_range[0]
@@ -473,8 +527,9 @@ def check_availability(order: list[dict], pool: list[dict], slot: int,
                                       else my_picks[0] if my_picks else None)
 
     for _ in range(trials):
-        board = sorted(pool, key=lambda p: (p.get("adp") or 999)
-                       + rng.gauss(0, _board_noise(p, True)))
+        board = sorted(pool, key=lambda p: board_rank.get(p["name"], 999)
+                       + rng.gauss(0, _board_noise(
+                           board_rank.get(p["name"], 999), True)))
         gone: set[str] = set()
         starters_by_owner = [0] * (teams + 1)
         filled_by_owner: list[dict] = [{} for _ in range(teams + 1)]
