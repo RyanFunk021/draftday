@@ -21,6 +21,61 @@ $("#lastw").addEventListener("input", () => {
   $("#lastwv-last").textContent = v;
 });
 
+// ── league settings persist across refresh (localStorage, no accounts) ──
+const SETTINGS_KEY = "draftday-settings-v1";
+
+function saveSettings() {
+  const s = {
+    teams: $("[name=teams]").value, slot: $("[name=slot]").value,
+    bench: $("[name=bench]").value, style: $("[name=style]").value,
+    preset: $("#preset").value, lastw: $("#lastw").value,
+    roster: {}, scoring: {},
+  };
+  document.querySelectorAll("#roster input").forEach(i => {
+    s.roster[i.dataset.slot] = i.value;
+  });
+  document.querySelectorAll("[data-s]").forEach(i => {
+    s.scoring[i.dataset.s] = i.value;
+  });
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); }
+  catch { /* private browsing or a full quota is not worth surfacing */ }
+}
+
+function loadSettings() {
+  let s;
+  try { s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "null"); }
+  catch { return; }
+  if (!s) return;
+
+  if (s.teams) $("[name=teams]").value = s.teams;
+  if (s.slot) $("[name=slot]").value = s.slot;
+  if (s.bench) $("[name=bench]").value = s.bench;
+  if (s.style) $("[name=style]").value = s.style;
+  if (s.preset) $("#preset").value = s.preset;
+  if (s.lastw) {
+    $("#lastw").value = s.lastw;
+    $("#lastw").dispatchEvent(new Event("input"));
+  }
+  document.querySelectorAll("#roster input").forEach(i => {
+    if (s.roster && s.roster[i.dataset.slot] != null) i.value = s.roster[i.dataset.slot];
+  });
+  let anyScoring = false;
+  document.querySelectorAll("[data-s]").forEach(i => {
+    const v = s.scoring && s.scoring[i.dataset.s];
+    if (v != null && v !== "") { i.value = v; anyScoring = true; }
+  });
+  // Open the custom-scoring panel automatically if a saved value lives in
+  // it — otherwise the numbers are back but hidden, which looks like they
+  // did not actually restore.
+  if (anyScoring) $("#customscoring").open = true;
+}
+loadSettings();
+
+// Persist on every change rather than only at build time, so a refresh
+// mid-edit does not throw away typing that never made it into a request.
+$("#cfg").addEventListener("input", saveSettings);
+$("#preset").addEventListener("change", saveSettings);
+
 let ORDER = [];        // current list, user-editable
 let PLAYERS = {};      // name -> player
 let EXTRA_PLAYERS = []; // raw rows for players searched-and-added this session,
@@ -191,7 +246,10 @@ function renderBoard() {
   ORDER.forEach((name, i) => {
     const p = PLAYERS[name];
     const row = el("div", "row" + (i < starters ? " starter" : ""));
-    row.append(el("span", "rk", i + 1),
+    row.draggable = true;
+    row.dataset.name = name;
+    row.append(el("span", "drag", "⠿"),
+               el("span", "rk", i + 1),
                el("span", "pos", p.pos),
                el("span", "nm", `${p.name}${p.bye ? " · bye " + p.bye : ""}`),
                el("span", "pts", p.pts));
@@ -203,12 +261,55 @@ function renderBoard() {
     dn.onclick = ev => { ev.stopPropagation(); move(i, +1); };
     mv.append(up, dn); row.append(mv);
     row.onclick = () => toggleDetail(row, p);
+    wireDrag(row);
     board.append(row);
   });
 }
 
 function starterCount() {
   return Object.values(cfg().roster).reduce((a, b) => a + b, 0);
+}
+
+// ── drag to reorder ──
+// Native HTML5 drag-and-drop rather than a library: one file, no extra
+// dependency, and a vertical reorder of plain rows is exactly what it is
+// built for. The arrows still work too — drag is faster for a big jump,
+// arrows are more precise for "one spot."
+let dragName = null;
+
+function wireDrag(row) {
+  row.addEventListener("dragstart", e => {
+    dragName = row.dataset.name;
+    row.classList.add("dragging");
+    e.dataTransfer.effectAllowed = "move";
+    // Detail panels and odds rows are separate DOM siblings, not part of
+    // the row being dragged — close them so a stale one is not left
+    // pointing at whatever row happens to end up in that spot.
+    document.querySelectorAll(".detail, .rowodds").forEach(n => n.remove());
+  });
+  row.addEventListener("dragend", () => {
+    row.classList.remove("dragging");
+    document.querySelectorAll(".row.dragover").forEach(n => n.classList.remove("dragover"));
+    dragName = null;
+  });
+  row.addEventListener("dragover", e => {
+    e.preventDefault();
+    if (row.dataset.name === dragName) return;
+    e.dataTransfer.dropEffect = "move";
+    row.classList.add("dragover");
+  });
+  row.addEventListener("dragleave", () => row.classList.remove("dragover"));
+  row.addEventListener("drop", e => {
+    e.preventDefault();
+    row.classList.remove("dragover");
+    if (!dragName || row.dataset.name === dragName) return;
+    const from = ORDER.indexOf(dragName);
+    const to = ORDER.indexOf(row.dataset.name);
+    if (from === -1 || to === -1) return;
+    ORDER.splice(to, 0, ORDER.splice(from, 1)[0]);
+    renderBoard();
+    scheduleReorderRefresh();
+  });
 }
 
 function move(i, d) {

@@ -14,7 +14,7 @@ from pathlib import Path
 
 from flask import Flask, Response, jsonify, render_template, request
 
-from engine.blend import load_pool
+from engine.blend import load_pool, load_rows, skill_compression
 from engine.rank import build_list
 from engine import sim as sim_mod
 from engine import news as news_mod
@@ -144,11 +144,13 @@ def add_player():
 def build():
     payload = request.get_json(force=True, silent=True) or {}
     L = league_from(payload)
-    pool = load_pool(L["scoring"], L["last_weight"],
-                     extra_rows=_extras_from(payload))
+    extras = _extras_from(payload)
+    pool = load_pool(L["scoring"], L["last_weight"], extra_rows=extras)
     if not pool:
         return jsonify({"error": "No player data."}), 500
-    order = build_list(pool, L["teams"], L["roster"], L["bench"])
+    compression = skill_compression(load_rows(extras), L["scoring"])
+    order = build_list(pool, L["teams"], L["roster"], L["bench"],
+                       compression=compression)
 
     news_mod.attach(order)
 
@@ -280,7 +282,16 @@ def _order_from(payload: dict, pool: list[dict], L: dict) -> list[dict]:
     by_name = {p["name"]: p for p in pool}
     names = payload.get("order") or []
     order = [by_name[n] for n in names if n in by_name]
-    return order or build_list(pool, L["teams"], L["roster"], L["bench"])
+    if order:
+        return order
+    # Degenerate path: a caller reached this endpoint without an explicit
+    # order (normally /api/build already ran and the client is echoing its
+    # result back). Rebuilding needs the same compression signal /api/build
+    # used, or K/DEF placement would silently differ between the two.
+    compression = skill_compression(load_rows(_extras_from(payload)),
+                                    L["scoring"])
+    return build_list(pool, L["teams"], L["roster"], L["bench"],
+                      compression=compression)
 
 
 @app.route("/api/simulate", methods=["POST"])

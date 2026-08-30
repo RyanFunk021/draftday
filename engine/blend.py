@@ -13,7 +13,7 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
-from .scoring import season_points
+from .scoring import season_points, DEFAULT_SCORING
 from .gamelogs import fetch_weekly, weekly_stats, norm
 
 DATA = Path(__file__).resolve().parent.parent / "data"
@@ -34,6 +34,50 @@ def _f(v) -> float:
         return 0.0
 
 
+SKILL_COMPRESSION_BASELINE = {**DEFAULT_SCORING, "ppr": 0.5}   # half-PPR
+
+
+def load_rows(extra_rows: list[dict] | None = None) -> list[dict]:
+    """Raw projections.csv rows (plus any session-added extras), before
+    scoring. Shared by load_pool() and skill_compression() so both work
+    from the identical row set without reading the file twice."""
+    rows = list(csv.DictReader((DATA / "projections.csv").open()))
+    if extra_rows:
+        have = {(r.get("name") or "").strip().lower() for r in rows}
+        rows += [r for r in extra_rows
+                if (r.get("name") or "").strip().lower() not in have]
+    return rows
+
+
+def skill_compression(rows: list[dict], scoring: dict) -> float:
+    """How much this league's scoring shrinks skill-position points versus
+    the site's own default league (half-PPR, standard yardage), as a single
+    ratio: 1.0 = no change, 0.7 = this league scores skill positions at 70%
+    of the default. The baseline is half-PPR specifically because that is
+    what a new list defaults to, not bare 0-PPR — otherwise every ordinary
+    half-PPR league would show as "inflated" relative to a reference nobody
+    actually plays under.
+
+    Kicker and defense scoring never depends on yardage rates, so a format
+    that halves yardage-derived points (like HFL) leaves K/DEF exactly
+    where they were while every skill player around them scores less. That
+    is a real value shift worth reacting to (see rank.py), and this ratio
+    is the cheap way to detect it: total skill-position points under this
+    scoring divided by the same rows under the baseline, no second network
+    call or game-log refetch needed since it only touches the projection
+    numbers already sitting in `rows`.
+    """
+    skill_rows = [r for r in rows
+                 if (r.get("pos") or "").upper().strip()
+                 not in ("K", "DEF", "DST", "D/ST")]
+    if not skill_rows:
+        return 1.0
+    this_total = sum(season_points(r, scoring) for r in skill_rows)
+    base_total = sum(season_points(r, SKILL_COMPRESSION_BASELINE)
+                     for r in skill_rows)
+    return this_total / base_total if base_total else 1.0
+
+
 def load_pool(scoring: dict, last_weight: int = 50,
               extra_rows: list[dict] | None = None) -> list[dict]:
     """Every draftable player, scored and blended. last_weight is 0-100.
@@ -45,11 +89,7 @@ def load_pool(scoring: dict, last_weight: int = 50,
     src=espn2025 — so a session-added player is not a second-class entry,
     just one that did not (yet, or ever) make it into the shared file.
     """
-    rows = list(csv.DictReader((DATA / "projections.csv").open()))
-    if extra_rows:
-        have = {(r.get("name") or "").strip().lower() for r in rows}
-        rows += [r for r in extra_rows
-                if (r.get("name") or "").strip().lower() not in have]
+    rows = load_rows(extra_rows)
     names = [r["name"] for r in rows if r.get("name")]
     weeks = fetch_weekly(names)
     w = max(0, min(100, int(last_weight))) / 100.0
