@@ -61,7 +61,13 @@ Late-round upside picks worth a flier or a bench stash for next year, from real 
 Your likely starting roster, including bench
 
 ## roster-hint
-One example draft using this exact list, against eleven teams on Yahoo's default board. Reorder your list above and this updates.
+One example draft using this exact list, against eleven teams on Yahoo's default board. It does not update automatically as you reorder your list above. Press the button when you want to see it recalculated.
+
+## roster-update-button
+Update team
+
+## roster-stale
+You've changed your list since this was last calculated.
 
 ## avail-heading
 Can I get this guy?

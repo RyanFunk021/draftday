@@ -83,7 +83,6 @@ let EXTRA_PLAYERS = []; // raw rows for players searched-and-added this session,
                         // same way as everyone else even if the shared-pool
                         // write (which /api/add-player already attempted)
                         // hasn't landed for some reason
-let reorderTimer = null;
 
 function cfg() {
   const roster = {};
@@ -138,6 +137,7 @@ function applyBuild(d) {
   renderBoard();
   renderTips(d.tips);
   renderRosterPreview(d.rosterPreview);
+  $("#rosterstale").hidden = true;
 }
 
 // ── search and add a player not on the pool ──
@@ -367,12 +367,12 @@ function bandFor(pct) {
   return "long";
 }
 
-// Reordering changes both the likely roster and (if a detail panel with
-// odds is open) the availability odds. Debounced so a burst of arrow
-// clicks does not fire a request per click.
+// Reordering does NOT recompute the roster preview automatically — it used
+// to, silently, 500ms after the last edit, which meant "did my drag do
+// anything?" had no visible answer. Now a rearrange just marks the existing
+// preview stale; recomputing is an explicit button press.
 function scheduleReorderRefresh() {
-  clearTimeout(reorderTimer);
-  reorderTimer = setTimeout(refreshRosterPreview, 500);
+  if (!$("#rosterwrap").hidden) $("#rosterstale").hidden = false;
 }
 
 function toggleDetail(row, p) {
@@ -442,11 +442,20 @@ function renderRosterPreview(roster) {
 }
 
 async function refreshRosterPreview() {
+  const btn = $("#updateroster");
+  btn.disabled = true; btn.textContent = "Updating…";
   try {
     const d = await post("/api/roster-preview", cfg());
     renderRosterPreview(d.roster);
-  } catch { /* the build already validated the league; a transient failure here is not worth surfacing */ }
+    $("#rosterstale").hidden = true;
+  } catch (err) {
+    $("#rosterstale").hidden = false;
+    $("#rosterstale").textContent = err.message || "Couldn't update right now.";
+  } finally {
+    btn.disabled = false; btn.textContent = COPY["roster-update-button"];
+  }
 }
+$("#updateroster").addEventListener("click", refreshRosterPreview);
 
 // ── season simulation, streamed and paced to feel like the real work it is ──
 const SIM_SECONDS = 5;
