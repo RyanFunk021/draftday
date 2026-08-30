@@ -21,11 +21,9 @@ from __future__ import annotations
 
 import json
 import re
+import threading
 import time
 import urllib.request
-from concurrent.futures import (
-    ThreadPoolExecutor, TimeoutError as FutureTimeoutError, as_completed,
-)
 from pathlib import Path
 
 CACHE = Path(__file__).resolve().parent.parent / "data" / "news_cache.json"
@@ -34,13 +32,20 @@ TEAMS_URL = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams"
 NEWS_URL = ("https://site.api.espn.com/apis/site/v2/sports/football/nfl/"
             "news?limit=50&team={id}")
 TIMEOUT = 8
-# Hard wall-clock budget for the whole 32-team fetch. This runs inline in an
-# HTTP request (see engine.news.attach), and the host's worker timeout (e.g.
-# gunicorn's default 30s) kills the whole request if this runs long — with 32
-# teams at 8-way concurrency, 4 sequential batches at the old 20s TIMEOUT
-# could take up to 80s on a slow network and 500 the page. Whatever articles
-# haven't arrived by the deadline are skipped; a partial fetch beats none.
-FETCH_BUDGET = 12
+
+# fetch_articles() used to run inline in the request that needed it, bounded
+# by a wall-clock budget. That bound was sized against a fast local network;
+# on a slower or more congested host (observed in production) even a single
+# team call can eat most of the budget, and the request as a whole can still
+# run past the WSGI server's own worker timeout (e.g. gunicorn's default
+# 30s), which kills the worker and turns "no news today" into a 500 for the
+# whole page. News is explicitly an enhancement (see attach()), so a request
+# must never wait on it: refresh_lock + refresh_started make sure at most one
+# background refresh is in flight at a time, kicked off by whichever request
+# first notices the cache is missing or stale, while every request --
+# including that one -- returns immediately with whatever is already cached.
+_refresh_lock = threading.Lock()
+_refresh_started = 0.0
 
 # Words that signal an article actually matters for a fantasy decision, most
 # consequential first. Used to rank a player's articles, not to filter them.
@@ -71,15 +76,10 @@ def _team_ids() -> list[str]:
             for t in d["sports"][0]["leagues"][0]["teams"]]
 
 
-def fetch_articles(force: bool = False) -> list[dict]:
-    """All recent NFL articles, de-duplicated. Cached to disk."""
-    if not force and CACHE.exists():
-        try:
-            blob = json.loads(CACHE.read_text())
-            if time.time() - blob.get("fetched", 0) < CACHE_TTL:
-                return blob["articles"]
-        except (json.JSONDecodeError, KeyError):
-            pass   # corrupt cache is not worth failing over
+def _fetch_live() -> list[dict]:
+    """Do the actual 32-team ESPN fetch. Slow and unbounded by design --
+    only ever called off the request thread, from _refresh_in_background."""
+    from concurrent.futures import ThreadPoolExecutor
 
     def one(tid):
         try:
@@ -94,24 +94,12 @@ def fetch_articles(force: bool = False) -> list[dict]:
 
     seen: dict[str, dict] = {}
     if ids:
-        deadline = time.monotonic() + FETCH_BUDGET
-        ex = ThreadPoolExecutor(max_workers=8)
-        try:
-            futures = [ex.submit(one, tid) for tid in ids]
-            remaining = deadline - time.monotonic()
-            try:
-                for fut in as_completed(futures, timeout=max(remaining, 0)):
-                    for a in fut.result():
-                        seen[str(a.get("id"))] = a
-            except FutureTimeoutError:
-                pass           # partial results beat blowing the request timeout
-        finally:
-            # Don't block shutdown on stragglers past the deadline -- Python
-            # 3.9+'s cancel_futures drops anything not yet started; threads
-            # already mid-request finish on their own and get GC'd normally.
-            ex.shutdown(wait=False, cancel_futures=True)
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            for batch in ex.map(one, ids):
+                for a in batch:
+                    seen[str(a.get("id"))] = a
 
-    articles = [{
+    return [{
         "id": str(a.get("id")),
         "headline": a.get("headline", ""),
         "description": (a.get("description") or "")[:300],
@@ -121,20 +109,49 @@ def fetch_articles(force: bool = False) -> list[dict]:
                      if c.get("type") == "athlete" and c.get("description")],
     } for a in seen.values()]
 
-    if articles:
-        CACHE.parent.mkdir(parents=True, exist_ok=True)
-        CACHE.write_text(json.dumps(
-            {"fetched": time.time(), "articles": articles}))
-        return articles
 
-    # Fetch failed (ESPN unreachable, blocked, or rate-limited). Stale news
-    # beats no news: the panel says how old it is, so a reader can judge it.
-    # Returning [] here would empty every player's news the moment the TTL
-    # lapsed, while a perfectly usable cache sat on disk.
+def _refresh_in_background() -> None:
+    global _refresh_started
+    with _refresh_lock:
+        if time.monotonic() - _refresh_started < 60:
+            return    # a refresh is already in flight (or just finished)
+        _refresh_started = time.monotonic()
+
+    def run():
+        try:
+            articles = _fetch_live()
+            if articles:
+                CACHE.parent.mkdir(parents=True, exist_ok=True)
+                CACHE.write_text(json.dumps(
+                    {"fetched": time.time(), "articles": articles}))
+        except Exception:
+            pass   # next request's staleness check will simply retry later
+
+    threading.Thread(target=run, daemon=True).start()
+
+
+def fetch_articles(force: bool = False) -> list[dict]:
+    """All recent NFL articles, de-duplicated. Cached to disk.
+
+    Never blocks on the network: this returns whatever is on disk right now
+    (however stale) and, if the cache is missing or past CACHE_TTL, kicks off
+    a background refresh for the *next* call to pick up. A request thread
+    must never wait on a live 32-team ESPN fetch -- see the module docstring
+    on _refresh_lock for why.
+    """
     try:
-        return json.loads(CACHE.read_text())["articles"]
+        blob = json.loads(CACHE.read_text())
+        articles = blob.get("articles", [])
+        stale = force or (time.time() - blob.get("fetched", 0) >= CACHE_TTL)
     except (OSError, json.JSONDecodeError, KeyError):
-        return []
+        articles, stale = [], True
+
+    if stale:
+        _refresh_in_background()
+
+    # Stale news beats no news: the panel can say how old it is, so a reader
+    # can judge it. An empty cache on first-ever run legitimately returns [].
+    return articles
 
 
 def cache_age_hours() -> float | None:
