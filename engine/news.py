@@ -23,7 +23,9 @@ import json
 import re
 import time
 import urllib.request
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import (
+    ThreadPoolExecutor, TimeoutError as FutureTimeoutError, as_completed,
+)
 from pathlib import Path
 
 CACHE = Path(__file__).resolve().parent.parent / "data" / "news_cache.json"
@@ -31,7 +33,14 @@ CACHE_TTL = 3 * 3600          # news moves, but not minute to minute
 TEAMS_URL = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams"
 NEWS_URL = ("https://site.api.espn.com/apis/site/v2/sports/football/nfl/"
             "news?limit=50&team={id}")
-TIMEOUT = 20
+TIMEOUT = 8
+# Hard wall-clock budget for the whole 32-team fetch. This runs inline in an
+# HTTP request (see engine.news.attach), and the host's worker timeout (e.g.
+# gunicorn's default 30s) kills the whole request if this runs long — with 32
+# teams at 8-way concurrency, 4 sequential batches at the old 20s TIMEOUT
+# could take up to 80s on a slow network and 500 the page. Whatever articles
+# haven't arrived by the deadline are skipped; a partial fetch beats none.
+FETCH_BUDGET = 12
 
 # Words that signal an article actually matters for a fantasy decision, most
 # consequential first. Used to rank a player's articles, not to filter them.
@@ -85,10 +94,22 @@ def fetch_articles(force: bool = False) -> list[dict]:
 
     seen: dict[str, dict] = {}
     if ids:
-        with ThreadPoolExecutor(max_workers=8) as ex:
-            for batch in ex.map(one, ids):
-                for a in batch:
-                    seen[str(a.get("id"))] = a
+        deadline = time.monotonic() + FETCH_BUDGET
+        ex = ThreadPoolExecutor(max_workers=8)
+        try:
+            futures = [ex.submit(one, tid) for tid in ids]
+            remaining = deadline - time.monotonic()
+            try:
+                for fut in as_completed(futures, timeout=max(remaining, 0)):
+                    for a in fut.result():
+                        seen[str(a.get("id"))] = a
+            except FutureTimeoutError:
+                pass           # partial results beat blowing the request timeout
+        finally:
+            # Don't block shutdown on stragglers past the deadline -- Python
+            # 3.9+'s cancel_futures drops anything not yet started; threads
+            # already mid-request finish on their own and get GC'd normally.
+            ex.shutdown(wait=False, cancel_futures=True)
 
     articles = [{
         "id": str(a.get("id")),
