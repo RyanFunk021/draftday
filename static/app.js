@@ -157,7 +157,6 @@ function applyBuild(d) {
   renderBoard();
   renderTips(d.tips);
   renderRosterPreview(d.rosterPreview);
-  $("#rosterstale").hidden = true;
 }
 
 // ── search and add a player not on the pool ──
@@ -328,7 +327,6 @@ function wireDrag(row) {
     if (from === -1 || to === -1) return;
     ORDER.splice(to, 0, ORDER.splice(from, 1)[0]);
     renderBoard();
-    scheduleReorderRefresh();
   });
 }
 
@@ -337,7 +335,6 @@ function move(i, d) {
   if (j < 0 || j >= ORDER.length) return null;
   [ORDER[i], ORDER[j]] = [ORDER[j], ORDER[i]];
   renderBoard();
-  scheduleReorderRefresh();
   return j;
 }
 
@@ -385,14 +382,6 @@ function bandFor(pct) {
   if (pct >= 60) return "";
   if (pct >= 25) return "risky";
   return "long";
-}
-
-// Reordering does NOT recompute the roster preview automatically — it used
-// to, silently, 500ms after the last edit, which meant "did my drag do
-// anything?" had no visible answer. Now a rearrange just marks the existing
-// preview stale; recomputing is an explicit button press.
-function scheduleReorderRefresh() {
-  if (!$("#rosterwrap").hidden) $("#rosterstale").hidden = false;
 }
 
 function toggleDetail(row, p) {
@@ -467,10 +456,8 @@ async function refreshRosterPreview() {
   try {
     const d = await post("/api/roster-preview", cfg());
     renderRosterPreview(d.roster);
-    $("#rosterstale").hidden = true;
   } catch (err) {
-    $("#rosterstale").hidden = false;
-    $("#rosterstale").textContent = err.message || "Couldn't update right now.";
+    alert(err.message || "Couldn't update right now.");
   } finally {
     btn.disabled = false; btn.textContent = COPY["roster-update-button"];
   }

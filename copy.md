@@ -69,9 +69,6 @@ One example draft using this exact list, against eleven teams on Yahoo's default
 ## roster-update-button
 Update team
 
-## roster-stale
-You've changed your list since this was last calculated.
-
 ## avail-heading
 Can I get this guy?
 
