@@ -21,6 +21,9 @@ Enter custom scoring (HFL, etc.)
 ## custom-scoring-hint
 Leave anything blank to keep the standard value. Yards per point: how many yards it takes to earn one point (25 is standard for passing). PPR: 0 for no points per catch, 0.5 for half, 1 for full.
 
+## dst-tiers-hint
+Team defense points, by how many points that defense allowed. Yahoo's default is shown as the placeholder in each box.
+
 ## build-button
 Build my optimized prerank draft list
 

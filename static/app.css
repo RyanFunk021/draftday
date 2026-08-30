@@ -41,6 +41,8 @@ details#customscoring summary::before { content: "▸ "; color: var(--muted); }
 details#customscoring[open] summary::before { content: "▾ "; }
 .grid.scoring input { width: 74px; }
 .grid.scoring label { font-size: 11px; }
+.tierhint { margin-top: 12px; }
+.grid.scoring.tiers label { width: 94px; }
 
 .weights { margin: 10px 0 2px; }
 .weights .ends { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 4px; }

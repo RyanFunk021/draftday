@@ -55,6 +55,17 @@
         <label>DST turnover <input data-s="dst_turnover" type="number" step="0.5" placeholder="2"></label>
         <label>DST TD <input data-s="dst_td" type="number" step="0.5" placeholder="6"></label>
       </div>
+
+      <p class="hint tierhint">{{ c['dst-tiers-hint'] }}</p>
+      <div class="grid scoring tiers">
+        <label>Pts allowed 0 <input data-tier="0" type="number" step="0.5" placeholder="10"></label>
+        <label>Pts allowed 1-6 <input data-tier="6" type="number" step="0.5" placeholder="7"></label>
+        <label>Pts allowed 7-13 <input data-tier="13" type="number" step="0.5" placeholder="4"></label>
+        <label>Pts allowed 14-20 <input data-tier="20" type="number" step="0.5" placeholder="1"></label>
+        <label>Pts allowed 21-27 <input data-tier="27" type="number" step="0.5" placeholder="0"></label>
+        <label>Pts allowed 28-34 <input data-tier="34" type="number" step="0.5" placeholder="-1"></label>
+        <label>Pts allowed 35+ <input data-tier="999" type="number" step="0.5" placeholder="-4"></label>
+      </div>
     </details>
 
     <h2>{{ c['weights-heading'] }}</h2>

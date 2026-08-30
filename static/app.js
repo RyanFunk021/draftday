@@ -29,13 +29,16 @@ function saveSettings() {
     teams: $("[name=teams]").value, slot: $("[name=slot]").value,
     bench: $("[name=bench]").value, style: $("[name=style]").value,
     preset: $("#preset").value, lastw: $("#lastw").value,
-    roster: {}, scoring: {},
+    roster: {}, scoring: {}, tiers: {},
   };
   document.querySelectorAll("#roster input").forEach(i => {
     s.roster[i.dataset.slot] = i.value;
   });
   document.querySelectorAll("[data-s]").forEach(i => {
     s.scoring[i.dataset.s] = i.value;
+  });
+  document.querySelectorAll("[data-tier]").forEach(i => {
+    s.tiers[i.dataset.tier] = i.value;
   });
   try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); }
   catch { /* private browsing or a full quota is not worth surfacing */ }
@@ -64,6 +67,10 @@ function loadSettings() {
     const v = s.scoring && s.scoring[i.dataset.s];
     if (v != null && v !== "") { i.value = v; anyScoring = true; }
   });
+  document.querySelectorAll("[data-tier]").forEach(i => {
+    const v = s.tiers && s.tiers[i.dataset.tier];
+    if (v != null && v !== "") { i.value = v; anyScoring = true; }
+  });
   // Open the custom-scoring panel automatically if a saved value lives in
   // it — otherwise the numbers are back but hidden, which looks like they
   // did not actually restore.
@@ -84,6 +91,11 @@ let EXTRA_PLAYERS = []; // raw rows for players searched-and-added this session,
                         // write (which /api/add-player already attempted)
                         // hasn't landed for some reason
 
+// Yahoo's own defaults, so a tier a user leaves blank keeps the standard
+// value rather than silently dropping out of the table (dst_points_per_game
+// needs all seven tiers present, in order, to integrate correctly).
+const DST_TIER_DEFAULTS = { 0: 10, 6: 7, 13: 4, 20: 1, 27: 0, 34: -1, 999: -4 };
+
 function cfg() {
   const roster = {};
   document.querySelectorAll("#roster input").forEach(i => {
@@ -93,6 +105,14 @@ function cfg() {
   document.querySelectorAll("[data-s]").forEach(i => {
     if (i.value !== "") scoring[i.dataset.s] = +i.value;
   });
+  const tierInputs = document.querySelectorAll("[data-tier]");
+  const anyTier = [...tierInputs].some(i => i.value !== "");
+  if (anyTier) {
+    scoring.dst_tiers = [...tierInputs].map(i => [
+      +i.dataset.tier,
+      i.value !== "" ? +i.value : DST_TIER_DEFAULTS[i.dataset.tier],
+    ]);
+  }
   return {
     teams: +$("[name=teams]").value, slot: +$("[name=slot]").value,
     bench: +$("[name=bench]").value, style: $("[name=style]").value,
