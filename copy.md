@@ -111,7 +111,7 @@ During the season
 ## manage-static
 - Set your lineup every week. Byes and injuries beat forgetfulness more than bad drafting.
 - Check the waiver wire Tuesday night. See the "likely available on waivers" note above for names to watch.
-- Never start a player listed Out or Doubtful. A healthy mediocre player beats an injured star.
+- Check the injury report before you lock your lineup. A healthy mediocre player usually beats a questionable star.
 - Trade from surplus, not from need.
 
 ## download-button
