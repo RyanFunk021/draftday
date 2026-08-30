@@ -1,51 +1,40 @@
-"""Player news from ESPN's public endpoints.
+"""Player news, read from a local CSV -- never fetched live during a request.
 
-No API key, no registration. ESPN exposes news per team; fetching all 32 gives
-~800 unique articles against ~50 from the general feed, which is the difference
-between covering a third of a draft board and covering most of it.
+This used to call ESPN's public news endpoints inline, per request, which
+sounds fine until the host's network is slow: even bounded and backgrounded,
+a live fetch is still a live fetch, and on at least one production host it
+was enough to blow past the WSGI server's own worker timeout and 500 the
+whole page just to attach "recent news" nobody was blocking on. News is
+explicitly an enhancement (see attach() below) -- it has no business being
+able to take the page down.
+
+data/player_news.csv is the source of truth now. It is NOT written by the
+running app. Refresh it offline, whenever you want (daily is reasonable),
+by running:
+
+    python scripts/refresh_news.py
+
+from your own machine, then commit the updated CSV. See that script for the
+actual ESPN fetch logic (unchanged from before, just moved out of the
+request path).
 
 Two ways an article gets attached to a player:
 
-  1. ESPN's own athlete tags (categories[].type == "athlete"). Authoritative
-     when present — it's ESPN asserting the article is about that person.
-  2. Full-name match in headline/description. Catches what the tags miss.
+  1. ESPN's own athlete tags, if the row's "athletes" column names them.
+  2. Full-name match in headline/description. Catches what tags miss.
 
 Name matching uses FULL names only. Last-name matching sounds better until
-"Brown" attaches Cleveland Browns coverage to Amon-Ra St. Brown, and there are
-enough Williamses and Johnsons in the NFL to make it actively wrong.
-
-Coverage runs ~60% of a typical board. The rest genuinely have no recent news,
-and saying so is more useful than inventing something.
+"Brown" attaches Cleveland Browns coverage to Amon-Ra St. Brown, and there
+are enough Williamses and Johnsons in the NFL to make it actively wrong.
 """
 from __future__ import annotations
 
-import json
+import csv
 import re
-import threading
-import time
-import urllib.request
 from pathlib import Path
 
-CACHE = Path(__file__).resolve().parent.parent / "data" / "news_cache.json"
-CACHE_TTL = 3 * 3600          # news moves, but not minute to minute
-TEAMS_URL = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams"
-NEWS_URL = ("https://site.api.espn.com/apis/site/v2/sports/football/nfl/"
-            "news?limit=50&team={id}")
-TIMEOUT = 8
-
-# fetch_articles() used to run inline in the request that needed it, bounded
-# by a wall-clock budget. That bound was sized against a fast local network;
-# on a slower or more congested host (observed in production) even a single
-# team call can eat most of the budget, and the request as a whole can still
-# run past the WSGI server's own worker timeout (e.g. gunicorn's default
-# 30s), which kills the worker and turns "no news today" into a 500 for the
-# whole page. News is explicitly an enhancement (see attach()), so a request
-# must never wait on it: refresh_lock + refresh_started make sure at most one
-# background refresh is in flight at a time, kicked off by whichever request
-# first notices the cache is missing or stale, while every request --
-# including that one -- returns immediately with whatever is already cached.
-_refresh_lock = threading.Lock()
-_refresh_started = 0.0
+CSV_PATH = Path(__file__).resolve().parent.parent / "data" / "player_news.csv"
+FIELDS = ["id", "headline", "description", "published", "url", "athletes"]
 
 # Words that signal an article actually matters for a fantasy decision, most
 # consequential first. Used to rank a player's articles, not to filter them.
@@ -60,117 +49,42 @@ SIGNAL = [
 ]
 
 
-def _get(url: str):
-    # No User-Agent header. ESPN 403s a descriptive UA ("RankMyDraft/1.0") and
-    # also 403s a spoofed browser one, while urllib's own default passes. Since
-    # dressing up as a browser is both blocked and dishonest, send nothing and
-    # let urllib identify itself.
-    req = urllib.request.Request(url)
-    with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
-        return json.load(r)
-
-
-def _team_ids() -> list[str]:
-    d = _get(TEAMS_URL)
-    return [t["team"]["id"]
-            for t in d["sports"][0]["leagues"][0]["teams"]]
-
-
-def _fetch_live() -> list[dict]:
-    """Do the actual 32-team ESPN fetch. Slow and unbounded by design --
-    only ever called off the request thread, from _refresh_in_background."""
-    from concurrent.futures import ThreadPoolExecutor
-
-    def one(tid):
-        try:
-            return _get(NEWS_URL.format(id=tid)).get("articles", [])
-        except Exception:
-            return []      # one dead team must not sink the whole fetch
-
-    try:
-        ids = _team_ids()
-    except Exception:
-        ids = []
-
-    seen: dict[str, dict] = {}
-    if ids:
-        with ThreadPoolExecutor(max_workers=8) as ex:
-            for batch in ex.map(one, ids):
-                for a in batch:
-                    seen[str(a.get("id"))] = a
-
-    return [{
-        "id": str(a.get("id")),
-        "headline": a.get("headline", ""),
-        "description": (a.get("description") or "")[:300],
-        "published": a.get("published", ""),
-        "url": (a.get("links", {}).get("web", {}) or {}).get("href", ""),
-        "athletes": [c.get("description") for c in a.get("categories", [])
-                     if c.get("type") == "athlete" and c.get("description")],
-    } for a in seen.values()]
-
-
-def _refresh_in_background() -> None:
-    global _refresh_started
-    with _refresh_lock:
-        if time.monotonic() - _refresh_started < 60:
-            return    # a refresh is already in flight (or just finished)
-        _refresh_started = time.monotonic()
-
-    def run():
-        try:
-            articles = _fetch_live()
-            if articles:
-                CACHE.parent.mkdir(parents=True, exist_ok=True)
-                CACHE.write_text(json.dumps(
-                    {"fetched": time.time(), "articles": articles}))
-        except Exception:
-            pass   # next request's staleness check will simply retry later
-
-    threading.Thread(target=run, daemon=True).start()
-
-
-def fetch_articles(force: bool = False) -> list[dict]:
-    """All recent NFL articles, de-duplicated. Cached to disk.
-
-    Never blocks on the network: this returns whatever is on disk right now
-    (however stale) and, if the cache is missing or past CACHE_TTL, kicks off
-    a background refresh for the *next* call to pick up. A request thread
-    must never wait on a live 32-team ESPN fetch -- see the module docstring
-    on _refresh_lock for why.
-    """
-    try:
-        blob = json.loads(CACHE.read_text())
-        articles = blob.get("articles", [])
-        stale = force or (time.time() - blob.get("fetched", 0) >= CACHE_TTL)
-    except (OSError, json.JSONDecodeError, KeyError):
-        articles, stale = [], True
-
-    if stale:
-        _refresh_in_background()
-
-    # Stale news beats no news: the panel can say how old it is, so a reader
-    # can judge it. An empty cache on first-ever run legitimately returns [].
+def load_articles() -> list[dict]:
+    """Everything in the local CSV. Missing file just means no news yet."""
+    if not CSV_PATH.exists():
+        return []
+    with CSV_PATH.open(newline="", encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+    articles = []
+    for r in rows:
+        articles.append({
+            "id": r.get("id", ""),
+            "headline": r.get("headline", ""),
+            "description": r.get("description", ""),
+            "published": r.get("published", ""),
+            "url": r.get("url", ""),
+            "athletes": [a.strip() for a in (r.get("athletes") or "").split("|")
+                        if a.strip()],
+        })
     return articles
 
 
 def cache_age_hours() -> float | None:
-    """How old the cached news is, or None if never fetched."""
-    try:
-        blob = json.loads(CACHE.read_text())
-        return (time.time() - blob.get("fetched", 0)) / 3600
-    except (OSError, json.JSONDecodeError):
+    """Hours since player_news.csv was last written, or None if it's never
+    been generated. Named cache_age_hours for compatibility with existing
+    callers -- this file is refreshed offline, not by a live request cache,
+    but "how stale is the news on screen" is the same question either way."""
+    if not CSV_PATH.exists():
         return None
+    import time
+    return (time.time() - CSV_PATH.stat().st_mtime) / 3600
 
 
 def newest_article() -> str:
     """Publish date of the most recent article held, YYYY-MM-DD."""
-    try:
-        blob = json.loads(CACHE.read_text())
-        dates = [a.get("published", "") for a in blob.get("articles", [])]
-        return max(d[:10] for d in dates if d) if any(dates) else ""
-    except (OSError, json.JSONDecodeError, ValueError):
-        return ""
+    articles = load_articles()
+    dates = [a.get("published", "")[:10] for a in articles if a.get("published")]
+    return max(dates) if dates else ""
 
 
 def _score(article: dict) -> int:
@@ -231,11 +145,11 @@ def index_by_player(names: list[str], articles: list[dict],
 def attach(players: list[dict], per_player: int = 3) -> int:
     """Attach a `news` list to each player. Returns how many players got any.
 
-    Never raises — news is an enhancement, and a ranking without it is still a
-    ranking. A network failure leaves every player with an empty list.
+    Never raises, never touches the network -- reads the local CSV only. A
+    missing or empty file leaves every player with an empty list.
     """
     try:
-        articles = fetch_articles()
+        articles = load_articles()
     except Exception:
         articles = []
     idx = index_by_player([p["name"] for p in players], articles, per_player)
