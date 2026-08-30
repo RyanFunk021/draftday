@@ -73,6 +73,15 @@
 <section id="listwrap" class="card" hidden>
   <h2>{{ c['list-heading'] }}</h2>
   <p class="hint">{{ c['list-hint'] }}</p>
+
+  <div id="playersearch">
+    <label class="searchlabel">{{ c['search-heading'] }}
+      <input id="searchbox" type="text" placeholder="{{ c['search-placeholder'] }}" autocomplete="off">
+    </label>
+    <p class="hint">{{ c['search-hint'] }}</p>
+    <div id="searchresults"></div>
+  </div>
+
   <div class="cols">
     <div id="board"></div>
     <aside id="tips"></aside>

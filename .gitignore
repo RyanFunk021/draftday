@@ -8,3 +8,4 @@ __pycache__/
 *.pyc
 data/news_cache.json
 data/gamelog_cache.json
+data/roster_cache.json

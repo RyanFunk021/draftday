@@ -23,6 +23,11 @@ $("#lastw").addEventListener("input", () => {
 
 let ORDER = [];        // current list, user-editable
 let PLAYERS = {};      // name -> player
+let EXTRA_PLAYERS = []; // raw rows for players searched-and-added this session,
+                        // sent on every request so they score and rank the
+                        // same way as everyone else even if the shared-pool
+                        // write (which /api/add-player already attempted)
+                        // hasn't landed for some reason
 let reorderTimer = null;
 
 function cfg() {
@@ -40,6 +45,7 @@ function cfg() {
     preset: $("#preset").value, roster, scoring,
     last_weight: +$("#lastw").value,
     order: ORDER,
+    extra_players: EXTRA_PLAYERS,
   };
 }
 
@@ -59,12 +65,7 @@ $("#cfg").addEventListener("submit", async e => {
   btn.disabled = true; $("#msg").textContent = "Building…";
   try {
     const d = await post("/api/build", cfg());
-    ORDER = d.players.map(p => p.name);
-    PLAYERS = {};
-    d.players.forEach(p => { PLAYERS[p.name] = p; });
-    renderBoard();
-    renderTips(d.tips);
-    renderRosterPreview(d.rosterPreview);
+    applyBuild(d);
     $("#listwrap").hidden = false;
     $("#rosterwrap").hidden = false;
     $("#simwrap").hidden = false;
@@ -74,6 +75,72 @@ $("#cfg").addEventListener("submit", async e => {
   } catch (err) { $("#msg").textContent = err.message; }
   finally { btn.disabled = false; }
 });
+
+function applyBuild(d) {
+  ORDER = d.players.map(p => p.name);
+  PLAYERS = {};
+  d.players.forEach(p => { PLAYERS[p.name] = p; });
+  renderBoard();
+  renderTips(d.tips);
+  renderRosterPreview(d.rosterPreview);
+}
+
+// ── search and add a player not on the pool ──
+let searchTimer = null;
+$("#searchbox").addEventListener("input", () => {
+  clearTimeout(searchTimer);
+  const q = $("#searchbox").value.trim();
+  const box = $("#searchresults");
+  if (q.length < 2) { box.replaceChildren(); return; }
+  searchTimer = setTimeout(() => runSearch(q), 350);
+});
+
+async function runSearch(q) {
+  const box = $("#searchresults");
+  box.replaceChildren(el("p", "searchmsg", "Searching…"));
+  try {
+    const r = await post("/api/search-players", { ...cfg(), query: q });
+    if (!r.players.length) {
+      box.replaceChildren(el("p", "searchmsg", "No match on an NFL roster."));
+      return;
+    }
+    box.replaceChildren(...r.players.map(p => {
+      const row = el("div", "searchhit");
+      row.append(el("span", "pos", p.pos), el("span", "nm", p.name),
+                el("span", "team", p.team));
+      const btn = el("button", null, "Add");
+      btn.type = "button";
+      btn.onclick = () => addPlayer(p.name, btn);
+      row.append(btn);
+      return row;
+    }));
+  } catch (err) {
+    box.replaceChildren(el("p", "searchmsg err", err.message));
+  }
+}
+
+async function addPlayer(name, btn) {
+  btn.disabled = true; btn.textContent = "Adding…";
+  try {
+    const r = await post("/api/add-player", { name });
+    // Only needed client-side if the shared-pool write didn't happen (a
+    // network hiccup, or some future gate) — otherwise the very next
+    // /api/build call already finds him in data/projections.csv. Sending
+    // it either way costs nothing and guarantees this session sees him
+    // immediately regardless.
+    EXTRA_PLAYERS.push(r.row);
+    const d = await post("/api/build", cfg());
+    applyBuild(d);
+    $("#searchbox").value = "";
+    $("#searchresults").replaceChildren(
+      el("p", "searchmsg", `Added ${name}. ${r.addedToSharedPool
+        ? "Confirmed against ESPN's roster and saved for future visitors too."
+        : "He's in your list now, but couldn't be confirmed for the shared list."}`));
+  } catch (err) {
+    btn.disabled = false; btn.textContent = "Add";
+    $("#searchresults").append(el("p", "searchmsg err", err.message));
+  }
+}
 
 // ── 20 to watch, three real sourced sections ──
 function renderTips(tips) {
@@ -180,7 +247,7 @@ async function bumpUp(i) {
 function oddsRow(hit, teams) {
   const row = el("div", "rowodds");
   if (!hit) {
-    row.textContent = "Outside your top targets — likely a very late or very safe pick.";
+    row.textContent = "Outside your top targets, likely a very late or very safe pick.";
     return row;
   }
   const round = Math.floor((hit.atPick - 1) / teams) + 1;
@@ -227,8 +294,8 @@ function buildDetail(p) {
   stat("Points (blended)", p.pts);
   stat("Projection", p.proj);
   stat("Last season", p.actual != null ? p.actual : "no data");
-  stat("Edge over replacement", p.vorp != null ? p.vorp : "—");
-  stat(`${p.pos} rank`, p.posRank || "—");
+  stat("Edge over replacement", p.vorp != null ? p.vorp : "n/a");
+  stat(`${p.pos} rank`, p.posRank || "n/a");
   if (p.dropToNext) stat("Points above next " + p.pos, p.dropToNext);
   stat("Weekly variance", p.measured ? `±${p.sd}` : `±${p.sd} (estimated)`);
   d.append(stats);

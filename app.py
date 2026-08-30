@@ -18,6 +18,7 @@ from engine.blend import load_pool
 from engine.rank import build_list
 from engine import sim as sim_mod
 from engine import news as news_mod
+from engine import addplayer
 from engine.draft_tips import DRAFT_TIPS
 
 app = Flask(__name__)
@@ -87,6 +88,16 @@ def league_from(payload: dict) -> dict:
     }
 
 
+def _extras_from(payload: dict) -> list[dict]:
+    """Session-added players (engine.addplayer rows) riding along on the
+    request. The app is otherwise stateless server-side — order, roster,
+    scoring all round-trip through the client on every call — so a
+    searched-and-added player follows the same pattern rather than needing
+    a server-side session store just for this."""
+    extras = payload.get("extra_players")
+    return extras if isinstance(extras, list) else []
+
+
 # ── routes ──────────────────────────────────────────────────────────────
 @app.route("/")
 def index():
@@ -94,10 +105,47 @@ def index():
                            copy_json=json.dumps(load_copy()))
 
 
+@app.route("/api/search-players", methods=["POST"])
+def search_players():
+    payload = request.get_json(force=True, silent=True) or {}
+    query = (payload.get("query") or "").strip()
+    L = league_from(payload)
+    pool = load_pool(L["scoring"], L["last_weight"],
+                     extra_rows=_extras_from(payload))
+    existing = {p["name"] for p in pool}
+    hits = addplayer.search(query, existing)
+    return jsonify({"players": hits})
+
+
+@app.route("/api/add-player", methods=["POST"])
+def add_player():
+    payload = request.get_json(force=True, silent=True) or {}
+    name = (payload.get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "No player name given."}), 400
+
+    row = addplayer.build_row(name)
+    if not row:
+        return jsonify({"error": f"Couldn't find {name} on an NFL roster "
+                                 f"with enough 2025 games to build a "
+                                 f"projection from, or he plays a position "
+                                 f"(K/DEF) this can't add automatically."}), 400
+
+    # Confirmation IS the ESPN roster match build_row() just did — position
+    # and team came from ESPN's own roster data, not the searching visitor's
+    # say-so — so the shared file write happens right here, not behind a
+    # separate human review step.
+    shared = addplayer.append_to_shared_pool(row)
+
+    return jsonify({"row": row, "addedToSharedPool": shared})
+
+
 @app.route("/api/build", methods=["POST"])
 def build():
-    L = league_from(request.get_json(force=True, silent=True) or {})
-    pool = load_pool(L["scoring"], L["last_weight"])
+    payload = request.get_json(force=True, silent=True) or {}
+    L = league_from(payload)
+    pool = load_pool(L["scoring"], L["last_weight"],
+                     extra_rows=_extras_from(payload))
     if not pool:
         return jsonify({"error": "No player data."}), 500
     order = build_list(pool, L["teams"], L["roster"], L["bench"])
@@ -247,7 +295,8 @@ def simulate():
     """
     payload = request.get_json(force=True, silent=True) or {}
     L = league_from(payload)
-    pool = load_pool(L["scoring"], L["last_weight"])
+    pool = load_pool(L["scoring"], L["last_weight"],
+                     extra_rows=_extras_from(payload))
     order = _order_from(payload, pool, L)
 
     err = _pool_too_shallow(pool, L)
@@ -295,7 +344,8 @@ def roster_preview():
     without running a season. Cheap enough to call on every reorder."""
     payload = request.get_json(force=True, silent=True) or {}
     L = league_from(payload)
-    pool = load_pool(L["scoring"], L["last_weight"])
+    pool = load_pool(L["scoring"], L["last_weight"],
+                     extra_rows=_extras_from(payload))
     order = _order_from(payload, pool, L)
 
     err = _pool_too_shallow(pool, L)
@@ -319,7 +369,8 @@ def availability():
     """
     payload = request.get_json(force=True, silent=True) or {}
     L = league_from(payload)
-    pool = load_pool(L["scoring"], L["last_weight"])
+    pool = load_pool(L["scoring"], L["last_weight"],
+                     extra_rows=_extras_from(payload))
     order = _order_from(payload, pool, L)
 
     err = _pool_too_shallow(pool, L)
@@ -378,16 +429,16 @@ def _season_tips(order: list[dict], pool: list[dict], L: dict) -> list[str]:
             names = ", ".join(p["name"] for p in stingy)
             tips.append(f"Defense swings about {round(def_scoring_spread)} "
                         f"points here between the best and worst options. "
-                        f"{names} allow the fewest points per game — stream "
-                        f"whichever one is on waivers and has a soft matchup "
-                        f"that week, rather than locking in one defense all "
-                        f"season.")
+                        f"{names} allow the fewest points per game, so "
+                        f"stream whichever one is on waivers and has a "
+                        f"soft matchup that week, rather than locking in "
+                        f"one defense all season.")
 
     # Superflex / two-QB: streaming a QB off waivers is a much bigger swing
     # than in a one-QB league, worth calling out because it changes behavior.
     if L["roster"].get("QB", 0) >= 2:
         tips.append("You start two quarterbacks. QB depth on waivers thins "
-                    "out fast — grab a second startable one in the last "
+                    "out fast, so grab a second startable one in the last "
                     "few rounds if your list did not already.")
 
     return tips
@@ -397,7 +448,8 @@ def _season_tips(order: list[dict], pool: list[dict], L: dict) -> list[str]:
 def export():
     payload = request.get_json(force=True, silent=True) or {}
     L = league_from(payload)
-    pool = load_pool(L["scoring"], L["last_weight"])
+    pool = load_pool(L["scoring"], L["last_weight"],
+                     extra_rows=_extras_from(payload))
     order = _order_from(payload, pool, L)
 
     buf = io.StringIO()

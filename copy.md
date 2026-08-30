@@ -13,7 +13,7 @@ Your league
 Simulation weighting
 
 ## weights-hint
-Slide toward projections if you trust this year's outlook more. Slide toward last year if you trust results more. Rookies keep their projection either way — there's nothing to weigh.
+Slide toward projections if you trust this year's outlook more. Slide toward last year if you trust results more. Rookies keep their projection either way, since there's nothing to weigh.
 
 ## custom-scoring-summary
 Enter custom scoring (HFL, etc.)
@@ -29,6 +29,15 @@ Your list
 
 ## list-hint
 Click a row for the full breakdown and news. The up arrow bumps a player higher and shows the round he'd likely go in and the odds he lasts that long. This exact order is what you download.
+
+## search-heading
+Missing someone?
+
+## search-placeholder
+Search for a player not on this list
+
+## search-hint
+Adds him to your list right away, built from his 2025 stats since there's no 2026 forecast for him yet. Kickers and defenses aren't searchable this way.
 
 ## tips-top-heading
 Top picks
@@ -103,7 +112,7 @@ Download the list
 Upload it in Yahoo under Draft, then Pre-Draft Rankings, then Import. Press Save after.
 
 ## luck
-Good luck.
+This is just a simulation. Fantasy football has high variance and is hard to predict. Good luck this season!
 
 ## footer
 Free tool, no guarantees. Projections and simulations are models, not predictions. Not affiliated with Yahoo, ESPN or the NFL.

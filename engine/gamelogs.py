@@ -34,6 +34,9 @@ DATA = Path(__file__).resolve().parent.parent / "data"
 CACHE = DATA / "gamelog_cache.json"
 CACHE_TTL = 7 * 24 * 3600      # last season's games do not change
 
+ROSTER_CACHE = DATA / "roster_cache.json"
+ROSTER_CACHE_TTL = 12 * 3600   # rosters shift (waivers, practice squad moves)
+
 TEAMS_URL = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams"
 ROSTER_URL = ("https://site.api.espn.com/apis/site/v2/sports/football/nfl/"
               "teams/{id}/roster")
@@ -92,17 +95,34 @@ def _num(v) -> float:
         return 0.0
 
 
-def athlete_index() -> dict[str, dict]:
+def athlete_index(force: bool = False) -> dict[str, dict]:
     """Every rostered NFL player, keyed by normalised name.
 
     Built from the 32 team rosters rather than a search endpoint, because
     search returns nothing useful and the roster route is the one already
     proven to work here.
+
+    Cached to disk: this is 32 live HTTP calls, which is fine once per
+    gamelog fetch but far too slow to run per keystroke behind a live player
+    search. A stale roster (someone traded last night) is a much smaller
+    problem than a search box that takes several seconds to respond.
     """
+    if not force and ROSTER_CACHE.exists():
+        try:
+            blob = json.loads(ROSTER_CACHE.read_text())
+            if time.time() - blob.get("fetched", 0) < ROSTER_CACHE_TTL:
+                return blob["index"]
+        except (OSError, json.JSONDecodeError):
+            pass
+
     try:
         teams = _get(TEAMS_URL)["sports"][0]["leagues"][0]["teams"]
     except Exception:
-        return {}
+        try:      # network down: stale roster beats no roster
+            return json.loads(ROSTER_CACHE.read_text()).get("index", {})
+        except (OSError, json.JSONDecodeError):
+            return {}
+    ab_of = {t["team"]["id"]: t["team"]["abbreviation"] for t in teams}
     ids = [t["team"]["id"] for t in teams]
 
     def one(tid):
@@ -120,6 +140,7 @@ def athlete_index() -> dict[str, dict]:
                         "name": a["displayName"],
                         "pos": ((a.get("position") or {}).get("abbreviation")
                                 or "").upper(),
+                        "team": ab_of.get(tid, ""),
                     })
         return out
 
@@ -128,6 +149,11 @@ def athlete_index() -> dict[str, dict]:
         for batch in ex.map(one, ids):
             for a in batch:
                 index.setdefault(norm(a["name"]), a)
+
+    if index:
+        ROSTER_CACHE.parent.mkdir(parents=True, exist_ok=True)
+        ROSTER_CACHE.write_text(json.dumps({"fetched": time.time(),
+                                            "index": index}))
     return index
 
 

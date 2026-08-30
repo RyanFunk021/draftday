@@ -34,9 +34,22 @@ def _f(v) -> float:
         return 0.0
 
 
-def load_pool(scoring: dict, last_weight: int = 50) -> list[dict]:
-    """Every draftable player, scored and blended. last_weight is 0-100."""
+def load_pool(scoring: dict, last_weight: int = 50,
+              extra_rows: list[dict] | None = None) -> list[dict]:
+    """Every draftable player, scored and blended. last_weight is 0-100.
+
+    extra_rows: same shape as a projections.csv row (engine.addplayer
+    builds them), for players a user searched for and added to just THIS
+    session. They go through the identical scoring path as everyone else —
+    same blend, same weekly-variance lookup, same backfill discount if
+    src=espn2025 — so a session-added player is not a second-class entry,
+    just one that did not (yet, or ever) make it into the shared file.
+    """
     rows = list(csv.DictReader((DATA / "projections.csv").open()))
+    if extra_rows:
+        have = {(r.get("name") or "").strip().lower() for r in rows}
+        rows += [r for r in extra_rows
+                if (r.get("name") or "").strip().lower() not in have]
     names = [r["name"] for r in rows if r.get("name")]
     weeks = fetch_weekly(names)
     w = max(0, min(100, int(last_weight))) / 100.0

@@ -57,6 +57,23 @@ button.ghost {
 }
 button.ghost:hover { border-color: var(--accent); color: var(--accent); }
 
+#playersearch { margin: 12px 0 16px; padding: 12px 14px; background: var(--card2);
+  border: 1px solid var(--line); border-radius: 7px; }
+.searchlabel { font-size: 12.5px; color: var(--muted); }
+.searchlabel input { width: 100%; max-width: 340px; margin-top: 3px; }
+#searchresults { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.searchhit {
+  display: flex; align-items: center; gap: 10px; padding: 7px 10px;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+  font-size: 13px;
+}
+.searchhit .pos { color: var(--muted); font-size: 11px; font-weight: 700; width: 30px; }
+.searchhit .nm { flex: 1; }
+.searchhit .team { color: var(--muted); font-size: 12px; }
+.searchhit button { margin: 0; padding: 4px 12px; font-size: 12px; }
+.searchmsg { font-size: 12.5px; color: var(--muted); padding: 4px 2px; }
+.searchmsg.err { color: var(--bad); }
+
 .cols { display: flex; gap: 24px; align-items: flex-start; }
 #board { flex: 1.6; min-width: 0; }
 #tips { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 18px; }
