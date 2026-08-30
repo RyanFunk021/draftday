@@ -474,4 +474,9 @@ def export():
 
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5051, debug=False)
+    # 127.0.0.1 for local dev; Render (and most PaaS hosts) route traffic to
+    # 0.0.0.0 on a port they assign via $PORT, so default to that in
+    # production and let local runs override with FLASK_RUN_HOST if needed.
+    host = os.environ.get("FLASK_RUN_HOST", "127.0.0.1")
+    port = int(os.environ.get("PORT", 5051))
+    app.run(host=host, port=port, debug=False)
