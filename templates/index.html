@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ c['title'] }}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body>
+
+<header class="top">
+  <h1>{{ c['title'] }}</h1>
+  <p class="tag">{{ c['tagline'] }}</p>
+</header>
+
+<main>
+
+<section id="setup" class="card">
+  <h2>{{ c['league-heading'] }}</h2>
+  <form id="cfg">
+    <div class="grid">
+      <label>Teams <input name="teams" type="number" value="12" min="4" max="20"></label>
+      <label>Your pick <input name="slot" type="number" value="1" min="1" max="20"></label>
+      <label>Bench <input name="bench" type="number" value="6" min="0" max="12"></label>
+      <label>Draft
+        <select name="style"><option value="snake">Snake</option>
+        <option value="linear">Linear</option></select>
+      </label>
+      <label>Scoring
+        <select id="preset"><option value="half_ppr">Half PPR</option>
+        <option value="ppr">Full PPR</option>
+        <option value="standard">Standard</option></select>
+      </label>
+    </div>
+    <div id="roster" class="grid roster"></div>
+
+    <h2>{{ c['weights-heading'] }}</h2>
+    <div class="weights">
+      <span>Projections</span>
+      <input id="lastw" type="range" min="0" max="100" value="50">
+      <span>Last season</span>
+      <b id="lastwv">50</b>
+    </div>
+    <p class="hint">{{ c['weights-hint'] }}</p>
+
+    <button id="go" type="submit">{{ c['build-button'] }}</button>
+    <span id="msg" class="hint"></span>
+  </form>
+</section>
+
+<section id="listwrap" class="card" hidden>
+  <h2>{{ c['list-heading'] }}</h2>
+  <p class="hint">{{ c['list-hint'] }}</p>
+  <div class="cols">
+    <div id="board"></div>
+    <aside id="tips">
+      <h3>{{ c['tips-heading'] }}</h3>
+      <p class="hint">{{ c['tips-hint'] }}</p>
+      <ol id="tiplist"></ol>
+    </aside>
+  </div>
+</section>
+
+<section id="simwrap" class="card" hidden>
+  <h2>{{ c['sim-heading'] }}</h2>
+  <p class="hint">{{ c['sim-hint'] }}</p>
+  <button id="simgo">{{ c['sim-button'] }}</button>
+  <span id="simmsg" class="hint"></span>
+  <div id="simout" hidden>
+    <div class="big"><b id="winnum"></b> {{ c['results-wins'] }}</div>
+    <div id="winbars"></div>
+    <p id="winrange" class="hint"></p>
+    <ul id="simfacts"></ul>
+    <h3>{{ c['manage-heading'] }}</h3>
+    <ul id="managelist"></ul>
+    <button id="dl">{{ c['download-button'] }}</button>
+    <p class="hint">{{ c['download-hint'] }}</p>
+    <p class="luck">{{ c['luck'] }}</p>
+  </div>
+</section>
+
+</main>
+
+<footer><p class="hint">{{ c['footer'] }}</p></footer>
+
+<script>const COPY = {{ copy_json|safe }};</script>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

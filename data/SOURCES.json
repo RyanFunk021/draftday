@@ -1,0 +1,8 @@
+{
+  "projections": {
+    "as_of": "2026-08-26",
+    "method": "hand-built from 2025 season production, depth charts and preseason reporting",
+    "note": "Receptions are ESTIMATED from receiving yards at position-typical rates (WR 13.0, TE 11.0, RB 8.0 yards per catch). The set was originally built for a no-PPR league and never recorded them.",
+    "caveat": "These are season-long projections, not a live injury feed. A player who got hurt after this date still carries his healthy projection."
+  }
+}

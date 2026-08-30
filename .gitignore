@@ -1,0 +1,10 @@
+# The parent repo ignores data/ wholesale (that rule is for the PKE project).
+# These files ARE the app: without them a deploy has no players to rank.
+!data/
+!data/projections.csv
+!data/SOURCES.json
+
+__pycache__/
+*.pyc
+data/news_cache.json
+data/gamelog_cache.json
