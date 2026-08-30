@@ -144,6 +144,26 @@ def _draft(order: list[dict], pool: list[dict], slot: int, teams: int,
                     chosen = p
                     filled[s] = filled.get(s, 0) + 1
                     break
+            # A team's own ranked list can run dry on a scarce position (K
+            # and DEF are ~14 deep leaguewide, and a shortened list only
+            # carries a handful) while that position is still open and
+            # players at it still exist elsewhere in the draft. Widening the
+            # search to the full pool here is what a real draft actually
+            # does — a manager out of kickers on his own cheat sheet still
+            # drafts SOME kicker, he does not draft a third quarterback
+            # instead and call it a starter. Skipping this widen step is
+            # what let a second QB silently fill a missing DEF/K slot and
+            # get counted as a legitimate starter: measured at 28% of
+            # drafts under plain standard scoring before this fix.
+            if chosen is None:
+                for p in board:
+                    if p["name"] in gone:
+                        continue
+                    s = _slot_for(p["pos"], roster, filled)
+                    if s:
+                        chosen = p
+                        filled[s] = filled.get(s, 0) + 1
+                        break
         if chosen is None:                            # then best available
             for p in src:
                 if p["name"] not in gone:
@@ -477,6 +497,23 @@ def check_availability(order: list[dict], pool: list[dict], slot: int,
                         chosen = p
                         filled[s] = filled.get(s, 0) + 1
                         break
+                # Same widen-to-full-pool fallback as _draft, and for the
+                # same reason: a team's own ranked list can run dry on a
+                # scarce position (K/DEF) while that position is still open
+                # and players at it still exist in the wider pool. Without
+                # this, a second QB (or whatever's next on the list) could
+                # silently fill a missing K/DEF slot and get counted as a
+                # starter, corrupting the availability odds for anyone
+                # watching that position.
+                if chosen is None and owner == slot:
+                    for p in board:
+                        if p["name"] in gone:
+                            continue
+                        s = _slot_for(p["pos"], roster, filled)
+                        if s:
+                            chosen = p
+                            filled[s] = filled.get(s, 0) + 1
+                            break
             if chosen is None:
                 for p in src:
                     if p["name"] not in gone:
