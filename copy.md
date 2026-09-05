@@ -122,3 +122,15 @@ This is just a simulation. Fantasy football has high variance and is hard to pre
 
 ## footer
 Free tool, no guarantees. Projections and simulations are models, not predictions. Not affiliated with Yahoo, ESPN or the NFL.
+
+## disabled-banner
+This tool is paused right now — what's below is a real example, not a live board. If you'd like it turned back on, leave a comment on my LinkedIn post.
+
+## disabled-heading
+DraftDay is paused
+
+## disabled-body
+DraftDay builds a ranked draft list for your exact league — teams, scoring, roster spots — and tests it against a simulated season before you draft. It's paused to save hosting costs while nobody's actively drafting. The board below is a real one it built for a 12-team half-PPR league, frozen so you can see what it does.
+
+## disabled-cta
+Want this running again? Leave a comment on my LinkedIn post and I'll switch it back on.

@@ -28,6 +28,20 @@ DEFAULT_ROSTER = {"QB": 1, "RB": 2, "WR": 2, "TE": 1, "WR/RB/TE": 1,
                   "K": 1, "DEF": 1}
 PRESETS = {"standard": 0.0, "half_ppr": 0.5, "ppr": 1.0}
 
+# Paused mode: flip DRAFTDAY_DISABLED in the Render dashboard's Environment
+# tab (no code push, no redeploy needed beyond Render's own env-var restart)
+# to serve a frozen sample page instead of the live tool. Checked once at
+# import time, not per-request -- Render restarts the process on an env var
+# change, so there is nothing to gain from re-reading it live. The
+# before_request guard below stops every /api/* handler before it runs, so
+# a disabled service never calls load_pool() -- the ~585 live ESPN requests
+# it fires on every build never happen.
+DISABLED = os.environ.get("DRAFTDAY_DISABLED", "").lower() in ("1", "true", "yes")
+
+
+def _load_frozen(name: str):
+    return json.loads((ROOT / "data" / "frozen" / name).read_text())
+
 
 # ── copy.md ─────────────────────────────────────────────────────────────
 _copy_cache: tuple[float, dict] | None = None
@@ -99,8 +113,24 @@ def _extras_from(payload: dict) -> list[dict]:
 
 
 # ── routes ──────────────────────────────────────────────────────────────
+@app.before_request
+def block_api_when_disabled():
+    # A frozen page has no build to run and nothing to search or export --
+    # this catches every /api/* route in one place (including any added
+    # later) rather than relying on each handler to check DISABLED itself.
+    if DISABLED and request.path.startswith("/api/"):
+        return jsonify({"error": "DraftDay is paused right now."}), 503
+
+
 @app.route("/")
 def index():
+    if DISABLED:
+        return render_template(
+            "disabled.html", c=load_copy(),
+            board=_load_frozen("sample_board.json"),
+            roster=_load_frozen("sample_roster.json"),
+            tips=_load_frozen("sample_tips.json"),
+        )
     return render_template("index.html", c=load_copy(),
                            copy_json=json.dumps(load_copy()))
 

@@ -1,0 +1,1402 @@
+[
+ {
+  "rk": 1,
+  "pos": "WR",
+  "label": "Jaxon Smith-Njigba \u00b7 bye 11",
+  "pts": "298.9",
+  "starter": true
+ },
+ {
+  "rk": 2,
+  "pos": "RB",
+  "label": "Christian McCaffrey \u00b7 bye 8",
+  "pts": "305.1",
+  "starter": true
+ },
+ {
+  "rk": 3,
+  "pos": "RB",
+  "label": "Jahmyr Gibbs \u00b7 bye 6",
+  "pts": "299.9",
+  "starter": true
+ },
+ {
+  "rk": 4,
+  "pos": "RB",
+  "label": "Bijan Robinson \u00b7 bye 11",
+  "pts": "296.6",
+  "starter": true
+ },
+ {
+  "rk": 5,
+  "pos": "WR",
+  "label": "Puka Nacua \u00b7 bye 11",
+  "pts": "277.2",
+  "starter": true
+ },
+ {
+  "rk": 6,
+  "pos": "RB",
+  "label": "Jonathan Taylor \u00b7 bye 15",
+  "pts": "285.4",
+  "starter": true
+ },
+ {
+  "rk": 7,
+  "pos": "WR",
+  "label": "Ja'Marr Chase \u00b7 bye 6",
+  "pts": "264.1",
+  "starter": true
+ },
+ {
+  "rk": 8,
+  "pos": "WR",
+  "label": "Amon-Ra St. Brown \u00b7 bye 6",
+  "pts": "252.2",
+  "starter": true
+ },
+ {
+  "rk": 9,
+  "pos": "RB",
+  "label": "De'Von Achane \u00b7 bye 6",
+  "pts": "263.6",
+  "starter": true
+ },
+ {
+  "rk": 10,
+  "pos": "RB",
+  "label": "James Cook III \u00b7 bye 7",
+  "pts": "255.8",
+  "starter": false
+ },
+ {
+  "rk": 11,
+  "pos": "TE",
+  "label": "Trey McBride \u00b7 bye 14",
+  "pts": "222.7",
+  "starter": false
+ },
+ {
+  "rk": 12,
+  "pos": "RB",
+  "label": "Derrick Henry \u00b7 bye 13",
+  "pts": "250.2",
+  "starter": false
+ },
+ {
+  "rk": 13,
+  "pos": "WR",
+  "label": "George Pickens \u00b7 bye 14",
+  "pts": "228.8",
+  "starter": false
+ },
+ {
+  "rk": 14,
+  "pos": "QB",
+  "label": "Josh Allen \u00b7 bye 7",
+  "pts": "377.3",
+  "starter": false
+ },
+ {
+  "rk": 15,
+  "pos": "RB",
+  "label": "Chase Brown \u00b7 bye 6",
+  "pts": "236.1",
+  "starter": false
+ },
+ {
+  "rk": 16,
+  "pos": "RB",
+  "label": "Kyren Williams \u00b7 bye 11",
+  "pts": "228.9",
+  "starter": false
+ },
+ {
+  "rk": 17,
+  "pos": "RB",
+  "label": "Saquon Barkley \u00b7 bye 10",
+  "pts": "224.7",
+  "starter": false
+ },
+ {
+  "rk": 18,
+  "pos": "RB",
+  "label": "Josh Jacobs \u00b7 bye 11",
+  "pts": "222.6",
+  "starter": false
+ },
+ {
+  "rk": 19,
+  "pos": "RB",
+  "label": "Ashton Jeanty \u00b7 bye 13",
+  "pts": "222.3",
+  "starter": false
+ },
+ {
+  "rk": 20,
+  "pos": "RB",
+  "label": "Javonte Williams \u00b7 bye 14",
+  "pts": "220.3",
+  "starter": false
+ },
+ {
+  "rk": 21,
+  "pos": "WR",
+  "label": "Nico Collins \u00b7 bye 8",
+  "pts": "198.8",
+  "starter": false
+ },
+ {
+  "rk": 22,
+  "pos": "WR",
+  "label": "CeeDee Lamb \u00b7 bye 14",
+  "pts": "193.7",
+  "starter": false
+ },
+ {
+  "rk": 23,
+  "pos": "WR",
+  "label": "Drake London \u00b7 bye 11",
+  "pts": "192.9",
+  "starter": false
+ },
+ {
+  "rk": 24,
+  "pos": "WR",
+  "label": "A.J. Brown \u00b7 bye 11",
+  "pts": "191.7",
+  "starter": false
+ },
+ {
+  "rk": 25,
+  "pos": "QB",
+  "label": "Matthew Stafford",
+  "pts": "342",
+  "starter": false
+ },
+ {
+  "rk": 26,
+  "pos": "TE",
+  "label": "Brock Bowers \u00b7 bye 13",
+  "pts": "175.6",
+  "starter": false
+ },
+ {
+  "rk": 27,
+  "pos": "RB",
+  "label": "Travis Etienne Jr. \u00b7 bye 8",
+  "pts": "203.9",
+  "starter": false
+ },
+ {
+  "rk": 28,
+  "pos": "RB",
+  "label": "D'Andre Swift \u00b7 bye 10",
+  "pts": "203.8",
+  "starter": false
+ },
+ {
+  "rk": 29,
+  "pos": "QB",
+  "label": "Drake Maye \u00b7 bye 11",
+  "pts": "337.4",
+  "starter": false
+ },
+ {
+  "rk": 30,
+  "pos": "WR",
+  "label": "Tetairoa McMillan \u00b7 bye 5",
+  "pts": "184.4",
+  "starter": false
+ },
+ {
+  "rk": 31,
+  "pos": "WR",
+  "label": "Tee Higgins \u00b7 bye 6",
+  "pts": "181",
+  "starter": false
+ },
+ {
+  "rk": 32,
+  "pos": "WR",
+  "label": "Chris Olave \u00b7 bye 8",
+  "pts": "180.5",
+  "starter": false
+ },
+ {
+  "rk": 33,
+  "pos": "RB",
+  "label": "TreVeyon Henderson \u00b7 bye 11",
+  "pts": "195.3",
+  "starter": false
+ },
+ {
+  "rk": 34,
+  "pos": "WR",
+  "label": "Jameson Williams \u00b7 bye 6",
+  "pts": "175.9",
+  "starter": false
+ },
+ {
+  "rk": 35,
+  "pos": "WR",
+  "label": "Zay Flowers \u00b7 bye 13",
+  "pts": "175.7",
+  "starter": false
+ },
+ {
+  "rk": 36,
+  "pos": "RB",
+  "label": "Kenneth Walker III \u00b7 bye 11",
+  "pts": "187.7",
+  "starter": false
+ },
+ {
+  "rk": 37,
+  "pos": "RB",
+  "label": "Breece Hall \u00b7 bye 13",
+  "pts": "186.2",
+  "starter": false
+ },
+ {
+  "rk": 38,
+  "pos": "TE",
+  "label": "Travis Kelce \u00b7 bye 5",
+  "pts": "154.5",
+  "starter": false
+ },
+ {
+  "rk": 39,
+  "pos": "RB",
+  "label": "Jaylen Warren \u00b7 bye 9",
+  "pts": "183.1",
+  "starter": false
+ },
+ {
+  "rk": 40,
+  "pos": "WR",
+  "label": "Brian Thomas Jr. \u00b7 bye 7",
+  "pts": "165.9",
+  "starter": false
+ },
+ {
+  "rk": 41,
+  "pos": "WR",
+  "label": "Courtland Sutton \u00b7 bye 10",
+  "pts": "165.4",
+  "starter": false
+ },
+ {
+  "rk": 42,
+  "pos": "QB",
+  "label": "Jalen Hurts \u00b7 bye 10",
+  "pts": "317",
+  "starter": false
+ },
+ {
+  "rk": 43,
+  "pos": "WR",
+  "label": "Ladd McConkey \u00b7 bye 7",
+  "pts": "164.5",
+  "starter": false
+ },
+ {
+  "rk": 44,
+  "pos": "WR",
+  "label": "Emeka Egbuka \u00b7 bye 10",
+  "pts": "164.4",
+  "starter": false
+ },
+ {
+  "rk": 45,
+  "pos": "QB",
+  "label": "Trevor Lawrence \u00b7 bye 7",
+  "pts": "316.1",
+  "starter": false
+ },
+ {
+  "rk": 46,
+  "pos": "WR",
+  "label": "DK Metcalf \u00b7 bye 9",
+  "pts": "163.3",
+  "starter": false
+ },
+ {
+  "rk": 47,
+  "pos": "TE",
+  "label": "George Kittle \u00b7 bye 8",
+  "pts": "148.8",
+  "starter": false
+ },
+ {
+  "rk": 48,
+  "pos": "WR",
+  "label": "Stefon Diggs \u00b7 bye 11",
+  "pts": "160.6",
+  "starter": false
+ },
+ {
+  "rk": 49,
+  "pos": "RB",
+  "label": "RJ Harvey \u00b7 bye 10",
+  "pts": "173",
+  "starter": false
+ },
+ {
+  "rk": 50,
+  "pos": "QB",
+  "label": "Caleb Williams \u00b7 bye 10",
+  "pts": "308.2",
+  "starter": false
+ },
+ {
+  "rk": 51,
+  "pos": "WR",
+  "label": "Jaylen Waddle \u00b7 bye 8",
+  "pts": "154.7",
+  "starter": false
+ },
+ {
+  "rk": 52,
+  "pos": "QB",
+  "label": "Bo Nix \u00b7 bye 10",
+  "pts": "306.4",
+  "starter": false
+ },
+ {
+  "rk": 53,
+  "pos": "WR",
+  "label": "Michael Pittman Jr. \u00b7 bye 13",
+  "pts": "153.7",
+  "starter": false
+ },
+ {
+  "rk": 54,
+  "pos": "RB",
+  "label": "Rico Dowdle \u00b7 bye 9",
+  "pts": "169.4",
+  "starter": false
+ },
+ {
+  "rk": 55,
+  "pos": "WR",
+  "label": "DeVonta Smith \u00b7 bye 10",
+  "pts": "152.5",
+  "starter": false
+ },
+ {
+  "rk": 56,
+  "pos": "TE",
+  "label": "Kyle Pitts Sr. \u00b7 bye 11",
+  "pts": "140.4",
+  "starter": false
+ },
+ {
+  "rk": 57,
+  "pos": "QB",
+  "label": "Patrick Mahomes \u00b7 bye 5",
+  "pts": "304.8",
+  "starter": false
+ },
+ {
+  "rk": 58,
+  "pos": "RB",
+  "label": "Bucky Irving \u00b7 bye 10",
+  "pts": "168.8",
+  "starter": false
+ },
+ {
+  "rk": 59,
+  "pos": "WR",
+  "label": "Rome Odunze \u00b7 bye 10",
+  "pts": "151.8",
+  "starter": false
+ },
+ {
+  "rk": 60,
+  "pos": "RB",
+  "label": "Quinshon Judkins \u00b7 bye 11",
+  "pts": "167.1",
+  "starter": false
+ },
+ {
+  "rk": 61,
+  "pos": "RB",
+  "label": "David Montgomery \u00b7 bye 8",
+  "pts": "166.7",
+  "starter": false
+ },
+ {
+  "rk": 62,
+  "pos": "TE",
+  "label": "Tyler Warren \u00b7 bye 13",
+  "pts": "137.5",
+  "starter": false
+ },
+ {
+  "rk": 63,
+  "pos": "RB",
+  "label": "Omarion Hampton \u00b7 bye 7",
+  "pts": "165.8",
+  "starter": false
+ },
+ {
+  "rk": 64,
+  "pos": "QB",
+  "label": "Jared Goff \u00b7 bye 6",
+  "pts": "301.5",
+  "starter": false
+ },
+ {
+  "rk": 65,
+  "pos": "TE",
+  "label": "Dallas Goedert \u00b7 bye 10",
+  "pts": "136.3",
+  "starter": false
+ },
+ {
+  "rk": 66,
+  "pos": "RB",
+  "label": "Tony Pollard \u00b7 bye 9",
+  "pts": "164.6",
+  "starter": false
+ },
+ {
+  "rk": 67,
+  "pos": "QB",
+  "label": "Dak Prescott \u00b7 bye 14",
+  "pts": "299.4",
+  "starter": false
+ },
+ {
+  "rk": 68,
+  "pos": "TE",
+  "label": "Juwan Johnson \u00b7 bye 8",
+  "pts": "133.7",
+  "starter": false
+ },
+ {
+  "rk": 69,
+  "pos": "WR",
+  "label": "Deebo Samuel Sr. \u00b7 bye 7",
+  "pts": "145.6",
+  "starter": false
+ },
+ {
+  "rk": 70,
+  "pos": "QB",
+  "label": "Justin Herbert \u00b7 bye 7",
+  "pts": "297.9",
+  "starter": false
+ },
+ {
+  "rk": 71,
+  "pos": "WR",
+  "label": "Marvin Harrison Jr. \u00b7 bye 14",
+  "pts": "144.4",
+  "starter": false
+ },
+ {
+  "rk": 72,
+  "pos": "WR",
+  "label": "Parker Washington \u00b7 bye 7",
+  "pts": "144.4",
+  "starter": false
+ },
+ {
+  "rk": 73,
+  "pos": "WR",
+  "label": "Michael Wilson \u00b7 bye 14",
+  "pts": "144.3",
+  "starter": false
+ },
+ {
+  "rk": 74,
+  "pos": "WR",
+  "label": "Jakobi Meyers \u00b7 bye 13",
+  "pts": "142.9",
+  "starter": false
+ },
+ {
+  "rk": 75,
+  "pos": "TE",
+  "label": "Hunter Henry \u00b7 bye 11",
+  "pts": "129.4",
+  "starter": false
+ },
+ {
+  "rk": 76,
+  "pos": "TE",
+  "label": "Harold Fannin Jr. \u00b7 bye 11",
+  "pts": "129.4",
+  "starter": false
+ },
+ {
+  "rk": 77,
+  "pos": "TE",
+  "label": "Dalton Schultz \u00b7 bye 8",
+  "pts": "128.5",
+  "starter": false
+ },
+ {
+  "rk": 78,
+  "pos": "TE",
+  "label": "Jake Ferguson \u00b7 bye 14",
+  "pts": "128.3",
+  "starter": false
+ },
+ {
+  "rk": 79,
+  "pos": "WR",
+  "label": "DJ Moore \u00b7 bye 7",
+  "pts": "139.5",
+  "starter": false
+ },
+ {
+  "rk": 80,
+  "pos": "RB",
+  "label": "Zach Charbonnet \u00b7 bye 11",
+  "pts": "155.9",
+  "starter": false
+ },
+ {
+  "rk": 81,
+  "pos": "QB",
+  "label": "Lamar Jackson \u00b7 bye 13",
+  "pts": "291.4",
+  "starter": false
+ },
+ {
+  "rk": 82,
+  "pos": "RB",
+  "label": "Woody Marks \u00b7 bye 8",
+  "pts": "155.6",
+  "starter": false
+ },
+ {
+  "rk": 83,
+  "pos": "RB",
+  "label": "Rhamondre Stevenson \u00b7 bye 11",
+  "pts": "155.6",
+  "starter": false
+ },
+ {
+  "rk": 84,
+  "pos": "WR",
+  "label": "Jauan Jennings \u00b7 bye 8",
+  "pts": "138.9",
+  "starter": false
+ },
+ {
+  "rk": 85,
+  "pos": "TE",
+  "label": "Colston Loveland \u00b7 bye 10",
+  "pts": "126.8",
+  "starter": false
+ },
+ {
+  "rk": 86,
+  "pos": "TE",
+  "label": "Sam LaPorta \u00b7 bye 6",
+  "pts": "126.5",
+  "starter": false
+ },
+ {
+  "rk": 87,
+  "pos": "TE",
+  "label": "Mark Andrews \u00b7 bye 13",
+  "pts": "124.5",
+  "starter": false
+ },
+ {
+  "rk": 88,
+  "pos": "QB",
+  "label": "Baker Mayfield \u00b7 bye 10",
+  "pts": "289",
+  "starter": false
+ },
+ {
+  "rk": 89,
+  "pos": "WR",
+  "label": "Wan'Dale Robinson \u00b7 bye 9",
+  "pts": "136.4",
+  "starter": false
+ },
+ {
+  "rk": 90,
+  "pos": "WR",
+  "label": "Rashee Rice \u00b7 bye 5",
+  "pts": "136.3",
+  "starter": false
+ },
+ {
+  "rk": 91,
+  "pos": "WR",
+  "label": "Khalil Shakir \u00b7 bye 7",
+  "pts": "135.7",
+  "starter": false
+ },
+ {
+  "rk": 92,
+  "pos": "TE",
+  "label": "Tucker Kraft \u00b7 bye 11",
+  "pts": "123.1",
+  "starter": false
+ },
+ {
+  "rk": 93,
+  "pos": "WR",
+  "label": "Terry McLaurin \u00b7 bye 7",
+  "pts": "135.1",
+  "starter": false
+ },
+ {
+  "rk": 94,
+  "pos": "WR",
+  "label": "Alec Pierce \u00b7 bye 13",
+  "pts": "134.9",
+  "starter": false
+ },
+ {
+  "rk": 95,
+  "pos": "WR",
+  "label": "Troy Franklin \u00b7 bye 10",
+  "pts": "134",
+  "starter": false
+ },
+ {
+  "rk": 96,
+  "pos": "WR",
+  "label": "Keenan Allen \u00b7 bye 13",
+  "pts": "133.7",
+  "starter": false
+ },
+ {
+  "rk": 97,
+  "pos": "WR",
+  "label": "Garrett Wilson \u00b7 bye 13",
+  "pts": "133.5",
+  "starter": false
+ },
+ {
+  "rk": 98,
+  "pos": "RB",
+  "label": "Tyrone Tracy Jr. \u00b7 bye 8",
+  "pts": "148.9",
+  "starter": false
+ },
+ {
+  "rk": 99,
+  "pos": "RB",
+  "label": "Kenny Gainwell \u00b7 bye 10",
+  "pts": "148.7",
+  "starter": false
+ },
+ {
+  "rk": 100,
+  "pos": "WR",
+  "label": "Quentin Johnston \u00b7 bye 7",
+  "pts": "130.9",
+  "starter": false
+ },
+ {
+  "rk": 101,
+  "pos": "WR",
+  "label": "Xavier Worthy \u00b7 bye 5",
+  "pts": "130.7",
+  "starter": false
+ },
+ {
+  "rk": 102,
+  "pos": "WR",
+  "label": "Malik Nabers \u00b7 bye 8",
+  "pts": "130.3",
+  "starter": false
+ },
+ {
+  "rk": 103,
+  "pos": "TE",
+  "label": "Colby Parkinson \u00b7 bye 11",
+  "pts": "116.4",
+  "starter": false
+ },
+ {
+  "rk": 104,
+  "pos": "WR",
+  "label": "Romeo Doubs \u00b7 bye 11",
+  "pts": "128",
+  "starter": false
+ },
+ {
+  "rk": 105,
+  "pos": "TE",
+  "label": "AJ Barner \u00b7 bye 11",
+  "pts": "114",
+  "starter": false
+ },
+ {
+  "rk": 106,
+  "pos": "WR",
+  "label": "Jordan Addison \u00b7 bye 6",
+  "pts": "126",
+  "starter": false
+ },
+ {
+  "rk": 107,
+  "pos": "TE",
+  "label": "T.J. Hockenson \u00b7 bye 6",
+  "pts": "113.2",
+  "starter": false
+ },
+ {
+  "rk": 108,
+  "pos": "WR",
+  "label": "Jerry Jeudy \u00b7 bye 11",
+  "pts": "125.1",
+  "starter": false
+ },
+ {
+  "rk": 109,
+  "pos": "WR",
+  "label": "Rashid Shaheed \u00b7 bye 8",
+  "pts": "124.5",
+  "starter": false
+ },
+ {
+  "rk": 110,
+  "pos": "TE",
+  "label": "Dalton Kincaid \u00b7 bye 7",
+  "pts": "112",
+  "starter": false
+ },
+ {
+  "rk": 111,
+  "pos": "RB",
+  "label": "Chuba Hubbard \u00b7 bye 5",
+  "pts": "139.4",
+  "starter": false
+ },
+ {
+  "rk": 112,
+  "pos": "TE",
+  "label": "Theo Johnson \u00b7 bye 8",
+  "pts": "108.8",
+  "starter": false
+ },
+ {
+  "rk": 113,
+  "pos": "TE",
+  "label": "Oronde Gadsden \u00b7 bye 7",
+  "pts": "106.8",
+  "starter": false
+ },
+ {
+  "rk": 114,
+  "pos": "WR",
+  "label": "Tre Tucker \u00b7 bye 13",
+  "pts": "118.8",
+  "starter": false
+ },
+ {
+  "rk": 115,
+  "pos": "WR",
+  "label": "Kayshon Boutte \u00b7 bye 8",
+  "pts": "116.1",
+  "starter": false
+ },
+ {
+  "rk": 116,
+  "pos": "WR",
+  "label": "Josh Downs \u00b7 bye 13",
+  "pts": "114.2",
+  "starter": false
+ },
+ {
+  "rk": 117,
+  "pos": "TE",
+  "label": "Evan Engram \u00b7 bye 10",
+  "pts": "101.9",
+  "starter": false
+ },
+ {
+  "rk": 118,
+  "pos": "WR",
+  "label": "Hollywood Brown \u00b7 bye 10",
+  "pts": "114",
+  "starter": false
+ },
+ {
+  "rk": 119,
+  "pos": "RB",
+  "label": "Jacory Croskey-Merritt",
+  "pts": "129.4",
+  "starter": false
+ },
+ {
+  "rk": 120,
+  "pos": "RB",
+  "label": "Cam Skattebo \u00b7 bye 8",
+  "pts": "126.9",
+  "starter": false
+ },
+ {
+  "rk": 121,
+  "pos": "WR",
+  "label": "Christian Watson \u00b7 bye 11",
+  "pts": "109.7",
+  "starter": false
+ },
+ {
+  "rk": 122,
+  "pos": "RB",
+  "label": "Bhayshul Tuten \u00b7 bye 7",
+  "pts": "126.1",
+  "starter": false
+ },
+ {
+  "rk": 123,
+  "pos": "TE",
+  "label": "David Njoku \u00b7 bye 11",
+  "pts": "97.2",
+  "starter": false
+ },
+ {
+  "rk": 124,
+  "pos": "RB",
+  "label": "Jordan Mason \u00b7 bye 6",
+  "pts": "125.9",
+  "starter": false
+ },
+ {
+  "rk": 125,
+  "pos": "WR",
+  "label": "Luther Burden III \u00b7 bye 10",
+  "pts": "109.2",
+  "starter": false
+ },
+ {
+  "rk": 126,
+  "pos": "TE",
+  "label": "Chig Okonkwo \u00b7 bye 9",
+  "pts": "97",
+  "starter": false
+ },
+ {
+  "rk": 127,
+  "pos": "QB",
+  "label": "Jordan Love \u00b7 bye 11",
+  "pts": "261.6",
+  "starter": false
+ },
+ {
+  "rk": 128,
+  "pos": "RB",
+  "label": "Kyle Monangai \u00b7 bye 10",
+  "pts": "125.7",
+  "starter": false
+ },
+ {
+  "rk": 129,
+  "pos": "TE",
+  "label": "Pat Freiermuth \u00b7 bye 9",
+  "pts": "96.3",
+  "starter": false
+ },
+ {
+  "rk": 130,
+  "pos": "TE",
+  "label": "Brenton Strange \u00b7 bye 7",
+  "pts": "95.8",
+  "starter": false
+ },
+ {
+  "rk": 131,
+  "pos": "TE",
+  "label": "Cade Otton \u00b7 bye 10",
+  "pts": "95.4",
+  "starter": false
+ },
+ {
+  "rk": 132,
+  "pos": "WR",
+  "label": "Keon Coleman \u00b7 bye 7",
+  "pts": "107.2",
+  "starter": false
+ },
+ {
+  "rk": 133,
+  "pos": "WR",
+  "label": "Brandin Cooks \u00b7 bye 14",
+  "pts": "107",
+  "starter": false
+ },
+ {
+  "rk": 134,
+  "pos": "QB",
+  "label": "Jacoby Brissett",
+  "pts": "259.3",
+  "starter": false
+ },
+ {
+  "rk": 135,
+  "pos": "RB",
+  "label": "Rachaad White \u00b7 bye 7",
+  "pts": "122.8",
+  "starter": false
+ },
+ {
+  "rk": 136,
+  "pos": "QB",
+  "label": "Daniel Jones",
+  "pts": "258.5",
+  "starter": false
+ },
+ {
+  "rk": 137,
+  "pos": "QB",
+  "label": "Jaxson Dart",
+  "pts": "257.1",
+  "starter": false
+ },
+ {
+  "rk": 138,
+  "pos": "WR",
+  "label": "Jayden Higgins \u00b7 bye 8",
+  "pts": "104.6",
+  "starter": false
+ },
+ {
+  "rk": 139,
+  "pos": "RB",
+  "label": "J.K. Dobbins \u00b7 bye 10",
+  "pts": "119.7",
+  "starter": false
+ },
+ {
+  "rk": 140,
+  "pos": "WR",
+  "label": "Chris Godwin Jr. \u00b7 bye 10",
+  "pts": "102.8",
+  "starter": false
+ },
+ {
+  "rk": 141,
+  "pos": "RB",
+  "label": "Kimani Vidal \u00b7 bye 7",
+  "pts": "119.3",
+  "starter": false
+ },
+ {
+  "rk": 142,
+  "pos": "RB",
+  "label": "Blake Corum \u00b7 bye 11",
+  "pts": "119.1",
+  "starter": false
+ },
+ {
+  "rk": 143,
+  "pos": "QB",
+  "label": "Sam Darnold \u00b7 bye 11",
+  "pts": "254.7",
+  "starter": false
+ },
+ {
+  "rk": 144,
+  "pos": "WR",
+  "label": "Ryan Flournoy \u00b7 bye 14",
+  "pts": "101.8",
+  "starter": false
+ },
+ {
+  "rk": 145,
+  "pos": "K",
+  "label": "Brandon Aubrey \u00b7 bye 14",
+  "pts": "187",
+  "starter": false
+ },
+ {
+  "rk": 146,
+  "pos": "K",
+  "label": "Cameron Dicker \u00b7 bye 7",
+  "pts": "180",
+  "starter": false
+ },
+ {
+  "rk": 147,
+  "pos": "K",
+  "label": "Ka'imi Fairbairn \u00b7 bye 8",
+  "pts": "179",
+  "starter": false
+ },
+ {
+  "rk": 148,
+  "pos": "K",
+  "label": "Jake Bates \u00b7 bye 6",
+  "pts": "163",
+  "starter": false
+ },
+ {
+  "rk": 149,
+  "pos": "WR",
+  "label": "Calvin Ridley \u00b7 bye 9",
+  "pts": "99.7",
+  "starter": false
+ },
+ {
+  "rk": 150,
+  "pos": "RB",
+  "label": "Aaron Jones Sr. \u00b7 bye 6",
+  "pts": "115.7",
+  "starter": false
+ },
+ {
+  "rk": 151,
+  "pos": "RB",
+  "label": "Isiah Pacheco \u00b7 bye 5",
+  "pts": "114.2",
+  "starter": false
+ },
+ {
+  "rk": 152,
+  "pos": "TE",
+  "label": "Dawson Knox \u00b7 bye 7",
+  "pts": "84.9",
+  "starter": false
+ },
+ {
+  "rk": 153,
+  "pos": "RB",
+  "label": "Tyler Allgeier \u00b7 bye 14",
+  "pts": "113.2",
+  "starter": false
+ },
+ {
+  "rk": 154,
+  "pos": "TE",
+  "label": "Jake Tonges \u00b7 bye 8",
+  "pts": "84.2",
+  "starter": false
+ },
+ {
+  "rk": 155,
+  "pos": "RB",
+  "label": "Jerome Ford \u00b7 bye 11",
+  "pts": "112.5",
+  "starter": false
+ },
+ {
+  "rk": 156,
+  "pos": "TE",
+  "label": "Darren Waller \u00b7 bye 5",
+  "pts": "83.5",
+  "starter": false
+ },
+ {
+  "rk": 157,
+  "pos": "DEF",
+  "label": "Texans \u00b7 bye 8",
+  "pts": "157",
+  "starter": false
+ },
+ {
+  "rk": 158,
+  "pos": "DEF",
+  "label": "Seahawks \u00b7 bye 11",
+  "pts": "152",
+  "starter": false
+ },
+ {
+  "rk": 159,
+  "pos": "DEF",
+  "label": "Broncos \u00b7 bye 10",
+  "pts": "139.9",
+  "starter": false
+ },
+ {
+  "rk": 160,
+  "pos": "DEF",
+  "label": "Steelers \u00b7 bye 9",
+  "pts": "139.2",
+  "starter": false
+ },
+ {
+  "rk": 161,
+  "pos": "WR",
+  "label": "Jayden Reed \u00b7 bye 11",
+  "pts": "95",
+  "starter": false
+ },
+ {
+  "rk": 162,
+  "pos": "WR",
+  "label": "Darnell Mooney \u00b7 bye 11",
+  "pts": "93.7",
+  "starter": false
+ },
+ {
+  "rk": 163,
+  "pos": "WR",
+  "label": "Mack Hollins \u00b7 bye 11",
+  "pts": "92.4",
+  "starter": false
+ },
+ {
+  "rk": 164,
+  "pos": "WR",
+  "label": "Ricky Pearsall \u00b7 bye 8",
+  "pts": "92.3",
+  "starter": false
+ },
+ {
+  "rk": 165,
+  "pos": "WR",
+  "label": "Elic Ayomanor \u00b7 bye 9",
+  "pts": "92.3",
+  "starter": false
+ },
+ {
+  "rk": 166,
+  "pos": "WR",
+  "label": "Jalen Nailor \u00b7 bye 13",
+  "pts": "91",
+  "starter": false
+ },
+ {
+  "rk": 167,
+  "pos": "WR",
+  "label": "Cooper Kupp \u00b7 bye 11",
+  "pts": "90.4",
+  "starter": false
+ },
+ {
+  "rk": 168,
+  "pos": "TE",
+  "label": "Isaiah Likely \u00b7 bye 8",
+  "pts": "76.1",
+  "starter": false
+ },
+ {
+  "rk": 169,
+  "pos": "WR",
+  "label": "Matthew Golden \u00b7 bye 11",
+  "pts": "87.8",
+  "starter": false
+ },
+ {
+  "rk": 170,
+  "pos": "WR",
+  "label": "Tez Johnson \u00b7 bye 10",
+  "pts": "86.5",
+  "starter": false
+ },
+ {
+  "rk": 171,
+  "pos": "RB",
+  "label": "Tyjae Spears \u00b7 bye 9",
+  "pts": "102.6",
+  "starter": false
+ },
+ {
+  "rk": 172,
+  "pos": "WR",
+  "label": "Chimere Dike \u00b7 bye 9",
+  "pts": "85.6",
+  "starter": false
+ },
+ {
+  "rk": 173,
+  "pos": "RB",
+  "label": "Chris Rodriguez Jr. \u00b7 bye 7",
+  "pts": "100.5",
+  "starter": false
+ },
+ {
+  "rk": 174,
+  "pos": "QB",
+  "label": "Cam Ward \u00b7 bye 9",
+  "pts": "236.3",
+  "starter": false
+ },
+ {
+  "rk": 175,
+  "pos": "WR",
+  "label": "Malik Washington \u00b7 bye 6",
+  "pts": "83.3",
+  "starter": false
+ },
+ {
+  "rk": 176,
+  "pos": "WR",
+  "label": "Adonai Mitchell \u00b7 bye 13",
+  "pts": "82.7",
+  "starter": false
+ },
+ {
+  "rk": 177,
+  "pos": "WR",
+  "label": "Darius Slayton \u00b7 bye 8",
+  "pts": "82.3",
+  "starter": false
+ },
+ {
+  "rk": 178,
+  "pos": "TE",
+  "label": "Mason Taylor \u00b7 bye 13",
+  "pts": "69.1",
+  "starter": false
+ },
+ {
+  "rk": 179,
+  "pos": "QB",
+  "label": "Jayden Daniels \u00b7 bye 7",
+  "pts": "233.1",
+  "starter": false
+ },
+ {
+  "rk": 180,
+  "pos": "WR",
+  "label": "Kendrick Bourne \u00b7 bye 14",
+  "pts": "80.5",
+  "starter": false
+ },
+ {
+  "rk": 181,
+  "pos": "WR",
+  "label": "Andrei Iosivas \u00b7 bye 6",
+  "pts": "79.9",
+  "starter": false
+ },
+ {
+  "rk": 182,
+  "pos": "WR",
+  "label": "Jalen Coker \u00b7 bye 5",
+  "pts": "79.8",
+  "starter": false
+ },
+ {
+  "rk": 183,
+  "pos": "WR",
+  "label": "Xavier Hutchinson \u00b7 bye 8",
+  "pts": "79.4",
+  "starter": false
+ },
+ {
+  "rk": 184,
+  "pos": "TE",
+  "label": "Gunnar Helm \u00b7 bye 9",
+  "pts": "67.1",
+  "starter": false
+ },
+ {
+  "rk": 185,
+  "pos": "TE",
+  "label": "Noah Fant \u00b7 bye 8",
+  "pts": "66.7",
+  "starter": false
+ },
+ {
+  "rk": 186,
+  "pos": "QB",
+  "label": "Joe Burrow \u00b7 bye 6",
+  "pts": "231.2",
+  "starter": false
+ },
+ {
+  "rk": 187,
+  "pos": "QB",
+  "label": "Brock Purdy \u00b7 bye 8",
+  "pts": "230.7",
+  "starter": false
+ },
+ {
+  "rk": 188,
+  "pos": "WR",
+  "label": "Tyquan Thornton \u00b7 bye 5",
+  "pts": "77.9",
+  "starter": false
+ },
+ {
+  "rk": 189,
+  "pos": "WR",
+  "label": "DeMario Douglas \u00b7 bye 11",
+  "pts": "77.2",
+  "starter": false
+ },
+ {
+  "rk": 190,
+  "pos": "WR",
+  "label": "Calvin Austin III \u00b7 bye 8",
+  "pts": "77.2",
+  "starter": false
+ },
+ {
+  "rk": 191,
+  "pos": "TE",
+  "label": "Jonnu Smith \u00b7 bye 11",
+  "pts": "65",
+  "starter": false
+ },
+ {
+  "rk": 192,
+  "pos": "RB",
+  "label": "Alvin Kamara \u00b7 bye 8",
+  "pts": "93.7",
+  "starter": false
+ },
+ {
+  "rk": 193,
+  "pos": "TE",
+  "label": "Tyler Higbee \u00b7 bye 11",
+  "pts": "64",
+  "starter": false
+ },
+ {
+  "rk": 194,
+  "pos": "RB",
+  "label": "Devin Singletary \u00b7 bye 8",
+  "pts": "91.9",
+  "starter": false
+ },
+ {
+  "rk": 195,
+  "pos": "WR",
+  "label": "Xavier Legette \u00b7 bye 5",
+  "pts": "75.1",
+  "starter": false
+ },
+ {
+  "rk": 196,
+  "pos": "TE",
+  "label": "Mike Gesicki \u00b7 bye 6",
+  "pts": "62.8",
+  "starter": false
+ },
+ {
+  "rk": 197,
+  "pos": "QB",
+  "label": "Aaron Rodgers",
+  "pts": "226.9",
+  "starter": false
+ },
+ {
+  "rk": 198,
+  "pos": "QB",
+  "label": "Bryce Young",
+  "pts": "226",
+  "starter": false
+ },
+ {
+  "rk": 199,
+  "pos": "TE",
+  "label": "Darnell Washington \u00b7 bye 9",
+  "pts": "61.4",
+  "starter": false
+ },
+ {
+  "rk": 200,
+  "pos": "TE",
+  "label": "Michael Mayer \u00b7 bye 13",
+  "pts": "60.6",
+  "starter": false
+ }
+]

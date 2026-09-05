@@ -1,0 +1,92 @@
+[
+ {
+  "bench": false,
+  "lbl": "RB",
+  "nm": "Christian McCaffrey (RB)",
+  "pts": "305.1 pts \u00b7 bye 8"
+ },
+ {
+  "bench": false,
+  "lbl": "RB",
+  "nm": "James Cook III (RB)",
+  "pts": "255.8 pts \u00b7 bye 7"
+ },
+ {
+  "bench": false,
+  "lbl": "WR/RB/TE",
+  "nm": "Derrick Henry (RB)",
+  "pts": "250.2 pts \u00b7 bye 13"
+ },
+ {
+  "bench": false,
+  "lbl": "WR",
+  "nm": "George Pickens (WR)",
+  "pts": "228.8 pts \u00b7 bye 14"
+ },
+ {
+  "bench": false,
+  "lbl": "QB",
+  "nm": "Matthew Stafford (QB)",
+  "pts": "342 pts"
+ },
+ {
+  "bench": false,
+  "lbl": "WR",
+  "nm": "Chris Olave (WR)",
+  "pts": "180.5 pts \u00b7 bye 8"
+ },
+ {
+  "bench": false,
+  "lbl": "TE",
+  "nm": "Kyle Pitts Sr. (TE)",
+  "pts": "140.4 pts \u00b7 bye 11"
+ },
+ {
+  "bench": false,
+  "lbl": "K",
+  "nm": "Brandon Aubrey (K)",
+  "pts": "187 pts \u00b7 bye 14"
+ },
+ {
+  "bench": false,
+  "lbl": "DEF",
+  "nm": "Seahawks (DEF)",
+  "pts": "152 pts \u00b7 bye 11"
+ },
+ {
+  "bench": true,
+  "lbl": "BENCH",
+  "nm": "Javonte Williams (RB)",
+  "pts": "220.3 pts \u00b7 bye 14"
+ },
+ {
+  "bench": true,
+  "lbl": "BENCH",
+  "nm": "Trevor Lawrence (QB)",
+  "pts": "316.1 pts \u00b7 bye 7"
+ },
+ {
+  "bench": true,
+  "lbl": "BENCH",
+  "nm": "RJ Harvey (RB)",
+  "pts": "173 pts \u00b7 bye 10"
+ },
+ {
+  "bench": true,
+  "lbl": "BENCH",
+  "nm": "Parker Washington (WR)",
+  "pts": "144.4 pts \u00b7 bye 7"
+ },
+ {
+  "bench": true,
+  "lbl": "BENCH",
+  "nm": "Michael Wilson (WR)",
+  "pts": "144.3 pts \u00b7 bye 14"
+ },
+ {
+  "bench": true,
+  "lbl": "BENCH",
+  "nm": "Dalton Schultz (TE)",
+  "pts": "128.5 pts \u00b7 bye 8"
+ }
+]

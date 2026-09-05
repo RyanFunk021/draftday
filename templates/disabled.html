@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ c['title'] }} — paused</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='disabled.css') }}">
+</head>
+<body>
+
+<div class="disabled-banner">
+  <p>{{ c['disabled-banner'] }}</p>
+</div>
+
+<header class="top">
+  <h1>{{ c['title'] }}</h1>
+  <p class="tag">{{ c['tagline'] }}</p>
+</header>
+
+<main>
+
+<section class="card">
+  <h2>{{ c['disabled-heading'] }}</h2>
+  <p class="hint">{{ c['disabled-body'] }}</p>
+  <p class="hint disabled-cta">{{ c['disabled-cta'] }}</p>
+</section>
+
+<section class="card">
+  <h2>{{ c['list-heading'] }}</h2>
+  <p class="hint">Sample list: 12 teams, half-PPR, pick 5. Frozen — not live data.</p>
+
+  <div class="cols">
+    <div id="board" class="readonly">
+      {% for p in board %}
+      <div class="row{{ ' starter' if p.starter else '' }}">
+        <span class="rk">{{ p.rk }}</span>
+        <span class="pos">{{ p.pos }}</span>
+        <span class="nm">{{ p.label }}</span>
+        <span class="pts">{{ p.pts }}</span>
+      </div>
+      {% endfor %}
+    </div>
+
+    <aside id="tips">
+      <div class="tipsection">
+        <h3>{{ c['tips-top-heading'] }}</h3>
+        <p class="hint">{{ c['tips-top-hint'] }}</p>
+        <ol class="tiplist">
+          {% for t in tips.top %}
+          <li><b>{{ t.who }}</b> {{ t.note }}
+            <span class="src">Source: {{ t.source }}</span></li>
+          {% endfor %}
+        </ol>
+      </div>
+      <div class="tipsection">
+        <h3>{{ c['tips-value-heading'] }}</h3>
+        <p class="hint">{{ c['tips-value-hint'] }}</p>
+        <ol class="tiplist">
+          {% for t in tips.value %}
+          <li><b>{{ t.who }}</b> {{ t.note }}
+            <span class="src">Source: {{ t.source }}</span></li>
+          {% endfor %}
+        </ol>
+      </div>
+      <div class="tipsection">
+        <h3>{{ c['tips-deep-heading'] }}</h3>
+        <p class="hint">{{ c['tips-deep-hint'] }}</p>
+        <ol class="tiplist">
+          {% for t in tips.deep %}
+          <li><b>{{ t.who }}</b> {{ t.note }}
+            <span class="src">Source: {{ t.source }}</span></li>
+          {% endfor %}
+        </ol>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<section class="card">
+  <h2>{{ c['roster-heading'] }}</h2>
+  <p class="hint">{{ c['roster-hint'] }}</p>
+  <div class="roster-preview readonly">
+    {% for s in roster %}
+    <div class="slot{{ ' bench' if s.bench else '' }}">
+      <div class="lbl">{{ s.lbl }}</div>
+      <div class="nm">{{ s.nm }}<span class="pts">{{ s.pts }}</span></div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+</main>
+
+<footer><p class="hint">{{ c['footer'] }}</p></footer>
+
+</body>
+</html>

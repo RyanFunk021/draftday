@@ -1,0 +1,18 @@
+/* Disabled-mode overrides. app.css loads first; this only adds what the
+   paused snapshot page needs on top of it. */
+
+.disabled-banner {
+  position: sticky; top: 0; z-index: 10;
+  background: var(--warn); color: var(--accent-ink);
+  padding: 10px 16px; text-align: center; font-size: 13.5px; font-weight: 600;
+  margin: 0 calc(-50vw + 50%);
+}
+.disabled-banner p { max-width: 1000px; margin: 0 auto; }
+
+.disabled-cta { color: var(--ink); font-weight: 600; }
+
+#board.readonly .row { cursor: default; }
+#board.readonly .row:hover { background: none; }
+#board.readonly .row.starter:hover { background: var(--accent-soft); }
+
+.roster-preview.readonly .slot { cursor: default; }
