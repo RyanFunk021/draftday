@@ -36,7 +36,7 @@ PRESETS = {"standard": 0.0, "half_ppr": 0.5, "ppr": 1.0}
 # before_request guard below stops every /api/* handler before it runs, so
 # a disabled service never calls load_pool() -- the ~585 live ESPN requests
 # it fires on every build never happen.
-DISABLED = os.environ.get("DRAFTDAY_DISABLED", "").lower() in ("1", "true", "yes")
+DISABLED = os.environ.get("DRAFTDAY_DISABLED", "").strip().lower() in ("1", "true", "yes")
 
 
 def _load_frozen(name: str):
@@ -113,6 +113,17 @@ def _extras_from(payload: dict) -> list[dict]:
 
 
 # ── routes ──────────────────────────────────────────────────────────────
+@app.route("/healthz")
+def healthz():
+    # Exists so DRAFTDAY_DISABLED's actual effect on the running process can
+    # be checked from a URL -- the env var can be set correctly in Render's
+    # dashboard and still not take effect if the running deploy predates the
+    # code that reads it, which looks identical to a misconfigured variable
+    # from the outside otherwise.
+    return jsonify(disabled=DISABLED,
+                   raw_env=os.environ.get("DRAFTDAY_DISABLED"))
+
+
 @app.before_request
 def block_api_when_disabled():
     # A frozen page has no build to run and nothing to search or export --
