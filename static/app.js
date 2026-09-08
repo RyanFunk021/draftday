@@ -143,6 +143,7 @@ $("#cfg").addEventListener("submit", async e => {
     const d = await post("/api/build", cfg());
     applyBuild(d);
     $("#listwrap").hidden = false;
+    $("#draftwrap").hidden = false;
     $("#rosterwrap").hidden = false;
     $("#simwrap").hidden = false;
     $("#simout").hidden = true;
@@ -165,6 +166,11 @@ function applyBuild(d) {
   // nothing from before the rebuild is still sitting on screen.
   $("#searchbox").value = "";
   $("#searchresults").replaceChildren();
+  // A live draft in progress tracks players by name, not by reference into
+  // ORDER/PLAYERS, so a rebuild (e.g. adding a searched player) doesn't
+  // invalidate it -- just refresh its best-available panel against the new
+  // pool.
+  if (DRAFT) renderDraft();
 }
 
 // ── search and add a player not on the pool ──
@@ -456,14 +462,55 @@ function renderRosterPreview(roster) {
     return;
   }
   roster.forEach(p => {
-    const slot = el("div", "slot" + (p.slot === "BENCH" ? " bench" : ""));
+    const cls = "slot" + (p.slot === "BENCH" ? " bench" : "") + (p.empty ? " empty" : "");
+    const slot = el("div", cls);
     slot.append(el("div", "lbl", p.slot));
     const nm = el("div", "nm");
-    nm.append(document.createTextNode(`${p.name} (${p.pos})`),
-              el("span", "pts", `${p.pts} pts${p.bye ? " · bye " + p.bye : ""}`));
+    if (p.empty) {
+      nm.append(document.createTextNode("Empty"));
+    } else {
+      nm.append(document.createTextNode(`${p.name} (${p.pos})`),
+                el("span", "pts", `${p.pts} pts${p.bye ? " · bye " + p.bye : ""}`));
+    }
     slot.append(nm);
     box.append(slot);
   });
+}
+
+// Your ACTUAL roster from the live draft tracker, slotted the same greedy
+// way engine.sim._slot_for fills a team (mandatory positions first, in the
+// roster config's own order, then flex, then bench) -- except this reads
+// your real logged picks, not a simulated draft, and shows an empty slot
+// rather than guessing who'll eventually fill it.
+function myLiveRoster() {
+  const roster = cfg().roster;
+  const mine = DRAFT.picks.filter(p => p.owner === DRAFT.slot)
+    .map(p => PLAYERS[p.name]).filter(Boolean);
+  const used = new Set();
+  const result = [];
+
+  Object.entries(roster).forEach(([slot, n]) => {
+    if (slot.includes("/")) return;
+    for (let i = 0; i < n; i++) {
+      const p = mine.find(pl => !used.has(pl.name) && pl.pos === slot);
+      if (p) { used.add(p.name); result.push({ ...p, slot }); }
+      else result.push({ name: null, pos: slot, slot, empty: true });
+    }
+  });
+  Object.entries(roster).forEach(([slot, n]) => {
+    if (!slot.includes("/")) return;
+    const parts = slot.split("/");
+    for (let i = 0; i < n; i++) {
+      const p = mine.find(pl => !used.has(pl.name) && parts.includes(pl.pos));
+      if (p) { used.add(p.name); result.push({ ...p, slot }); }
+      else result.push({ name: null, pos: slot, slot, empty: true });
+    }
+  });
+  // Anything drafted beyond the starting slots is real bench depth --
+  // show it, don't hide it just because it exceeds the configured bench
+  // count (a real draft can end up deeper at one spot than planned).
+  mine.filter(pl => !used.has(pl.name)).forEach(pl => result.push({ ...pl, slot: "BENCH" }));
+  return result;
 }
 
 async function refreshRosterPreview() {
@@ -565,6 +612,380 @@ function finishSim(d) {
   });
   $("#simout").hidden = false;
   $("#simout").scrollIntoView({ behavior: "smooth" });
+}
+
+// ── live draft tracker ──
+// Entirely client-side, same pattern as ORDER/PLAYERS above: the server is
+// stateless, so "the draft so far" lives only in this tab, keyed by player
+// name rather than array position, so it survives a rebuild (see applyBuild).
+let DRAFT = null; // { teams, slot, style, rounds, totalPicks, picks: [] }
+
+function ownerForPick(overall, teams, style) {
+  // Same snake-order arithmetic as engine.sim._draft's owner calculation --
+  // one implementation of "whose turn is it," not a second guess at it.
+  const idx = overall - 1;
+  const rnd = Math.floor(idx / teams);
+  const i = idx % teams;
+  const linear = (style || "snake").toLowerCase().startsWith("lin");
+  return (linear || rnd % 2 === 0) ? i + 1 : teams - i;
+}
+
+$("#draftstart").addEventListener("click", () => {
+  const c = cfg();
+  const rounds = Object.values(c.roster).reduce((a, b) => a + b, 0) + c.bench;
+  DRAFT = {
+    teams: c.teams, slot: c.slot, style: c.style,
+    rounds, totalPicks: c.teams * rounds,
+    picks: [],
+  };
+  $("#draftstart").hidden = true;
+  $("#draftlive").hidden = false;
+  $("#rosterlivenote").hidden = false;
+  $("#updateroster").hidden = true;
+  renderDraft();
+});
+
+$("#draftrestart").addEventListener("click", () => {
+  DRAFT = null;
+  $("#draftlive").hidden = true;
+  $("#draftstart").hidden = false;
+  $("#rosterlivenote").hidden = true;
+  $("#updateroster").hidden = false;
+});
+
+function draftedNames() {
+  return new Set(DRAFT.picks.map(p => p.name));
+}
+
+// ── dynamic queue: value, adjusted for roster need and positional runs ──
+// Static VORP order is "best player overall," not "best pick for THIS
+// roster at THIS moment" -- a run on a position should pull its remaining
+// good players up (they're about to disappear), and an unfilled starting
+// slot should outrank a marginally-better luxury pick. Both are heuristics
+// layered ON TOP of the server's VORP order, not a replacement for it.
+const RUN_WINDOW = 8;        // how many recent picks count as "the room right now"
+const RUN_SHARE_MIN = 0.4;   // fraction of those at one position before it's a "run"
+const RUN_MIN_SAMPLE = 4;    // don't call it a run off 1-2 picks -- that's just noise
+const QUEUE_SIZE = 12;
+
+function myRosterCounts() {
+  const counts = {};
+  DRAFT.picks.filter(p => p.owner === DRAFT.slot).forEach(p => {
+    const pos = PLAYERS[p.name] && PLAYERS[p.name].pos;
+    if (pos) counts[pos] = (counts[pos] || 0) + 1;
+  });
+  return counts;
+}
+
+function recentPositionShare() {
+  const recent = DRAFT.picks.slice(-RUN_WINDOW);
+  if (recent.length < RUN_MIN_SAMPLE) return {};
+  const counts = {};
+  recent.forEach(p => {
+    const pos = PLAYERS[p.name] && PLAYERS[p.name].pos;
+    if (pos) counts[pos] = (counts[pos] || 0) + 1;
+  });
+  const share = {};
+  Object.keys(counts).forEach(pos => { share[pos] = counts[pos] / recent.length; });
+  return share;
+}
+
+function computeQueue() {
+  const gone = draftedNames();
+  const have = myRosterCounts();
+  const runShare = recentPositionShare();
+
+  // Fold flex slots ("WR/RB/TE") evenly across their eligible positions --
+  // good enough for "do I still need at least one starter here," which is
+  // the only thing this weighs; engine.vorp does the precise version
+  // server-side for the base ranking itself.
+  const need = {};
+  Object.entries(cfg().roster).forEach(([slot, n]) => {
+    const parts = slot.split("/");
+    parts.forEach(pos => { need[pos] = (need[pos] || 0) + n / parts.length; });
+  });
+
+  const scored = ORDER.filter(n => !gone.has(n)).map(name => {
+    const p = PLAYERS[name];
+    const base = p.vorp ?? p.pts ?? 0;
+
+    const openSlots = Math.max(0, (need[p.pos] || 0) - (have[p.pos] || 0));
+    const needBoost = openSlots > 0 ? 30 * Math.min(openSlots, 2) : 0;
+
+    const share = runShare[p.pos] || 0;
+    const runBoost = share >= RUN_SHARE_MIN ? share * 55 : 0;
+
+    const notes = [];
+    if (openSlots > 0) {
+      notes.push(`Fills your open ${p.pos} slot${openSlots >= 2 ? "s" : ""}`);
+    }
+    if (runBoost > 0) {
+      const n = Math.min(RUN_WINDOW, DRAFT.picks.length);
+      notes.push(`${Math.round(share * 100)}% of the last ${n} picks were `
+        + `${p.pos} — depth is thinning fast`);
+    }
+    if (!notes.length) {
+      notes.push(`Best value on the board (+${p.vorp ?? 0} over replacement)`);
+    }
+
+    return { name, p, score: base + needBoost + runBoost, notes };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, QUEUE_SIZE);
+}
+
+// ── comparison chart: floor / blended avg / ceiling, up to 4 players ──
+// Colors are the dataviz skill's validated dark-surface categorical slots
+// 1-4 (blue/orange/aqua/yellow), confirmed CVD-safe against this app's
+// background via scripts/validate_palette.js before use.
+const COMPARE_COLORS = ["#3987e5", "#d95926", "#199e70", "#c98500"];
+const COMPARE_MAX = 4;
+let COMPARE = [];
+
+function toggleCompare(name) {
+  const i = COMPARE.indexOf(name);
+  if (i >= 0) COMPARE.splice(i, 1);
+  else if (COMPARE.length < COMPARE_MAX) COMPARE.push(name);
+  renderCompareChart();
+}
+
+function renderCompareChart() {
+  const box = $("#draftchart");
+  if (!box) return;
+  box.replaceChildren();
+  const gone = DRAFT ? draftedNames() : new Set();
+  COMPARE = COMPARE.filter(n => !gone.has(n));
+
+  const rows = COMPARE.map(n => PLAYERS[n])
+    .filter(p => p && p.floor != null && p.weekly_avg != null && p.ceiling != null);
+  if (!rows.length) {
+    box.append(el("p", "hint", COPY["draft-compare-empty"]));
+    return;
+  }
+
+  const NS = "http://www.w3.org/2000/svg";
+  const W = 520, H = 220, M = { top: 18, right: 18, bottom: 26, left: 10 };
+  const plotW = W - M.left - M.right, plotH = H - M.top - M.bottom;
+  const cats = ["Floor", "Avg week", "Ceiling"];
+  const step = plotW / (cats.length - 1);
+  const xFor = i => M.left + step * i;
+
+  let lo = Math.min(...rows.map(p => p.floor));
+  let hi = Math.max(...rows.map(p => p.ceiling));
+  const pad = Math.max(2, (hi - lo) * 0.15);
+  lo = Math.max(0, lo - pad); hi += pad;
+  const yFor = v => M.top + plotH - ((v - lo) / (hi - lo || 1)) * plotH;
+
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.setAttribute("class", "comparechart");
+  svg.setAttribute("role", "img");
+
+  cats.forEach((c, i) => {
+    const x = xFor(i);
+    const grid = document.createElementNS(NS, "line");
+    grid.setAttribute("x1", x); grid.setAttribute("x2", x);
+    grid.setAttribute("y1", M.top); grid.setAttribute("y2", M.top + plotH);
+    grid.setAttribute("class", "chartgrid");
+    svg.append(grid);
+    const label = document.createElementNS(NS, "text");
+    label.setAttribute("x", x); label.setAttribute("y", H - 6);
+    label.setAttribute("text-anchor", i === 0 ? "start" : i === cats.length - 1 ? "end" : "middle");
+    label.setAttribute("class", "charttick");
+    label.textContent = c;
+    svg.append(label);
+  });
+
+  const endLabels = [];
+  rows.forEach((p, si) => {
+    const color = COMPARE_COLORS[si % COMPARE_COLORS.length];
+    const vals = [p.floor, p.weekly_avg, p.ceiling];
+    const pts = vals.map((v, i) => [xFor(i), yFor(v)]);
+
+    const path = document.createElementNS(NS, "path");
+    path.setAttribute("d", `M${pts.map(pt => pt.join(",")).join(" L")}`);
+    path.setAttribute("class", "chartline");
+    path.setAttribute("stroke", color);
+    svg.append(path);
+
+    pts.forEach(([x, y]) => {
+      const dot = document.createElementNS(NS, "circle");
+      dot.setAttribute("cx", x); dot.setAttribute("cy", y); dot.setAttribute("r", 4.5);
+      dot.setAttribute("fill", color);
+      dot.setAttribute("class", "chartdot");
+      svg.append(dot);
+    });
+
+    endLabels.push({ y: pts[2][1], name: p.name });
+  });
+
+  // Direct end-labels at the ceiling column -- mandatory once >=4 series
+  // share a chart -- nudged apart so close values don't collide.
+  endLabels.sort((a, b) => a.y - b.y);
+  for (let i = 1; i < endLabels.length; i++) {
+    if (endLabels[i].y - endLabels[i - 1].y < 13) endLabels[i].y = endLabels[i - 1].y + 13;
+  }
+  endLabels.forEach(l => {
+    const t = document.createElementNS(NS, "text");
+    t.setAttribute("x", xFor(2) - 6); t.setAttribute("y", l.y - 8);
+    t.setAttribute("text-anchor", "end");
+    t.setAttribute("class", "chartendlabel");
+    t.textContent = l.name.split(" ").slice(-1)[0];
+    svg.append(t);
+  });
+
+  const tip = el("div", "charttooltip"); tip.hidden = true;
+  cats.forEach((c, i) => {
+    const hit = document.createElementNS(NS, "rect");
+    hit.setAttribute("x", xFor(i) - step / 2); hit.setAttribute("y", M.top);
+    hit.setAttribute("width", step); hit.setAttribute("height", plotH);
+    hit.setAttribute("class", "charthit");
+    hit.setAttribute("tabindex", "0");
+    const show = () => {
+      tip.replaceChildren(el("b", null, c));
+      rows.forEach((p, si) => {
+        const row = el("div", "charttiprow");
+        const key = el("span", "chartkey");
+        key.style.background = COMPARE_COLORS[si % COMPARE_COLORS.length];
+        row.append(key, el("b", null, String([p.floor, p.weekly_avg, p.ceiling][i])),
+                  document.createTextNode(" " + p.name));
+        tip.append(row);
+      });
+      tip.hidden = false;
+    };
+    const hide = () => { tip.hidden = true; };
+    hit.addEventListener("pointerenter", show);
+    hit.addEventListener("focus", show);
+    hit.addEventListener("pointerleave", hide);
+    hit.addEventListener("blur", hide);
+    svg.append(hit);
+  });
+
+  const legend = el("div", "chartlegend");
+  rows.forEach((p, si) => {
+    const row = el("div", "chartlegendrow");
+    const key = el("span", "chartkey");
+    key.style.background = COMPARE_COLORS[si % COMPARE_COLORS.length];
+    row.append(key, el("b", null, p.name),
+              document.createTextNode(` — Floor ${p.floor} · Avg ${p.weekly_avg} · Ceiling ${p.ceiling}`));
+    legend.append(row);
+  });
+
+  box.append(svg, tip, legend);
+}
+
+function currentOverall() {
+  return DRAFT.picks.length + 1;
+}
+
+function submitPick(name) {
+  if (!DRAFT || currentOverall() > DRAFT.totalPicks) return;
+  const overall = currentOverall();
+  const round = Math.floor((overall - 1) / DRAFT.teams) + 1;
+  const owner = ownerForPick(overall, DRAFT.teams, DRAFT.style);
+  DRAFT.picks.push({ overall, round, owner, name });
+  renderDraft();
+}
+
+$("#draftundo").addEventListener("click", () => {
+  if (!DRAFT || !DRAFT.picks.length) return;
+  DRAFT.picks.pop();
+  renderDraft();
+});
+
+$("#draftsearchbox").addEventListener("input", () => {
+  if (!DRAFT) return;
+  const q = $("#draftsearchbox").value.trim().toLowerCase();
+  const box = $("#draftsearchresults");
+  if (q.length < 2) { box.replaceChildren(); return; }
+  const gone = draftedNames();
+  const hits = ORDER.filter(n => !gone.has(n) && n.toLowerCase().includes(q))
+                    .slice(0, 8);
+  if (!hits.length) {
+    box.replaceChildren(el("p", "searchmsg", "No match in your list."));
+    return;
+  }
+  box.replaceChildren(...hits.map(n => {
+    const p = PLAYERS[n];
+    const row = el("div", "searchhit");
+    row.append(el("span", "pos", p.pos), el("span", "nm", p.name),
+              el("span", "team", p.team));
+    const btn = el("button", null, "Log pick");
+    btn.type = "button";
+    btn.onclick = () => submitPick(n);
+    row.append(btn);
+    return row;
+  }));
+});
+
+function renderDraft() {
+  if (!DRAFT) return;
+  const overall = currentOverall();
+  const done = overall > DRAFT.totalPicks;
+
+  const status = $("#draftstatus");
+  if (done) {
+    status.textContent = COPY["draft-complete"];
+    status.className = "";
+  } else {
+    const round = Math.floor((overall - 1) / DRAFT.teams) + 1;
+    const owner = ownerForPick(overall, DRAFT.teams, DRAFT.style);
+    const mine = owner === DRAFT.slot;
+    status.textContent = `Pick ${overall} of ${DRAFT.totalPicks} · Round ${round} · `
+      + (mine ? "Your pick" : `Team ${owner} on the clock`);
+    status.className = mine ? "draftturn you" : "draftturn";
+  }
+
+  $("#draftundo").disabled = DRAFT.picks.length === 0;
+  $("#draftsearchbox").value = "";
+  $("#draftsearchresults").replaceChildren();
+
+  const best = $("#draftbest");
+  best.replaceChildren();
+  if (!done) {
+    best.append(el("h3", null, COPY["draft-best-heading"]));
+    best.append(el("p", "hint", COPY["draft-queue-hint"]));
+    const list = el("ol", "tiplist draftbestlist");
+    computeQueue().forEach(({ name, p, notes }) => {
+      const li = el("li");
+      const top = el("div", "draftqueuetop");
+      top.append(el("b", null, `${p.name} (${p.pos})`),
+                document.createTextNode(` — ${p.pts} pts`));
+      const btn = el("button", null, "Log pick");
+      btn.type = "button";
+      btn.onclick = () => submitPick(name);
+      top.append(document.createTextNode(" "), btn);
+
+      const chk = el("label", "comparechk");
+      const cb = el("input"); cb.type = "checkbox";
+      cb.checked = COMPARE.includes(name);
+      cb.disabled = !cb.checked && COMPARE.length >= COMPARE_MAX;
+      cb.onchange = () => toggleCompare(name);
+      chk.append(cb, document.createTextNode(" Compare"));
+      top.append(chk);
+
+      li.append(top);
+      notes.forEach(n => li.append(el("div", "queuenote", n)));
+      list.append(li);
+    });
+    best.append(list);
+  }
+  renderCompareChart();
+
+  const log = $("#draftlog");
+  if (!DRAFT.picks.length) {
+    log.replaceChildren(el("p", "hint", COPY["draft-log-empty"]));
+  } else {
+    log.replaceChildren(...[...DRAFT.picks].reverse().map(pk => {
+      const row = el("div", "draftlogrow" + (pk.owner === DRAFT.slot ? " you" : ""));
+      const who = pk.owner === DRAFT.slot ? "You" : `Team ${pk.owner}`;
+      row.textContent = `#${pk.overall} (Rd ${pk.round}) — ${who}: ${pk.name}`;
+      return row;
+    }));
+  }
+
+  renderRosterPreview(myLiveRoster());
 }
 
 $("#dl").addEventListener("click", async () => {

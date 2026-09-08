@@ -60,11 +60,62 @@ Deep sleepers
 ## tips-deep-hint
 Late-round upside picks worth a flier or a bench stash for next year, from real draft-strategy coverage.
 
+## draft-heading
+Run your draft
+
+## draft-hint
+Log your real draft, pick by pick, as it happens. Uses the Teams, Your pick, and Draft style you set above, so double-check those before you start. Log every pick in turn order — yours and everyone else's — and best-available updates after each one. Made a mistake? Undo the last pick below.
+
+## draft-start-button
+Start tracking this draft
+
+## draft-restart-hint
+Changed your league settings above? Start over below to keep pick numbers accurate.
+
+## draft-restart-button
+Start over
+
+## draft-best-heading
+Your draft queue
+
+## draft-queue-hint
+Reorders itself as the draft moves — a run on a position, or a starting slot you still haven't filled, pulls those players up with a note explaining why. Check a couple of boxes to compare them below.
+
+## draft-compare-heading
+Weekly range comparison
+
+## draft-compare-hint
+Each player's real floor, average, and ceiling from a single week last season — a flatter line means more consistent week to week, a steeper one means bigger boom/bust swings. Only shows for players with enough game-log history.
+
+## draft-compare-empty
+Check up to 4 players in the queue above to compare their weekly range here.
+
+## draft-search-heading
+Log the next pick
+
+## draft-search-placeholder
+Type a name to log the pick
+
+## draft-undo-button
+Undo last pick
+
+## draft-log-heading
+Picks so far
+
+## draft-log-empty
+No picks logged yet.
+
+## draft-complete
+Draft complete.
+
 ## roster-heading
 Your likely starting roster, including bench
 
 ## roster-hint
 One example draft using this exact list, against eleven teams on Yahoo's default board. It does not update automatically as you reorder your list above. Press the button when you want to see it recalculated.
+
+## roster-live-note
+Tracking your real draft below — this updates automatically with your actual picks, empty slots and all.
 
 ## roster-update-button
 Update team

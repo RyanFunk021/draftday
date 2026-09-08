@@ -160,7 +160,8 @@ def build():
     for p in order:
         row = {k: p.get(k) for k in
                ("rank", "name", "pos", "team", "bye", "pts", "proj",
-                "actual", "vorp", "posRank", "dropToNext", "measured", "sd")}
+                "actual", "vorp", "posRank", "dropToNext", "measured", "sd",
+                "weekly_avg", "floor", "ceiling")}
         row["news"] = [{"headline": a["headline"], "url": a["url"],
                         "published": a["published"], "direct": a["direct"]}
                        for a in (p.get("news") or [])]

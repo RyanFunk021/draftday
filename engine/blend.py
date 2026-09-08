@@ -124,6 +124,16 @@ def load_pool(scoring: dict, last_weight: int = 50,
             "actual": round(actual, 1) if actual is not None else None,
             "sd": round(sd, 1),
             "measured": bool(stats),
+            # Real week-to-week range, when measured -- lets a caller compare
+            # two similar-average players by how spiky vs. how consistent
+            # they actually were, not just their season total. All three
+            # come from the SAME weekly distribution (engine.gamelogs), so
+            # they share a per-week scale -- unlike `pts` above, which is a
+            # SEASON total blending in next year's projection, not a weekly
+            # measurement, and must never be plotted alongside these.
+            "weekly_avg": stats["mean"] if stats else None,
+            "floor": stats["floor"] if stats else None,
+            "ceiling": stats["ceiling"] if stats else None,
             # Points allowed per game, defenses only. Not used in scoring
             "pa_pg": _f(r.get("pa_pg")) if pos == "DEF" else None,
         })

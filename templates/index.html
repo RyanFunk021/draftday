@@ -99,9 +99,41 @@
   </div>
 </section>
 
+<section id="draftwrap" class="card" hidden>
+  <h2>{{ c['draft-heading'] }}</h2>
+  <p class="hint">{{ c['draft-hint'] }}</p>
+  <button id="draftstart" type="button">{{ c['draft-start-button'] }}</button>
+
+  <div id="draftlive" hidden>
+    <p id="draftstatus"></p>
+
+    <div id="draftbest"></div>
+
+    <div id="draftcompare" class="card2block">
+      <h3>{{ c['draft-compare-heading'] }}</h3>
+      <p class="hint">{{ c['draft-compare-hint'] }}</p>
+      <div id="draftchart"></div>
+    </div>
+
+    <label class="searchlabel">{{ c['draft-search-heading'] }}
+      <input id="draftsearchbox" type="text" placeholder="{{ c['draft-search-placeholder'] }}" autocomplete="off">
+    </label>
+    <div id="draftsearchresults"></div>
+
+    <button id="draftundo" type="button" class="ghost" disabled>{{ c['draft-undo-button'] }}</button>
+
+    <h3>{{ c['draft-log-heading'] }}</h3>
+    <div id="draftlog"></div>
+
+    <p class="hint draftrestarthint">{{ c['draft-restart-hint'] }}</p>
+    <button id="draftrestart" type="button" class="ghost">{{ c['draft-restart-button'] }}</button>
+  </div>
+</section>
+
 <section id="rosterwrap" class="card" hidden>
   <h2>{{ c['roster-heading'] }}</h2>
   <p class="hint">{{ c['roster-hint'] }}</p>
+  <p id="rosterlivenote" class="hint rosterlivenote" hidden>{{ c['roster-live-note'] }}</p>
   <button id="updateroster" type="button">{{ c['roster-update-button'] }}</button>
   <div id="rosterpreview" class="roster-preview"></div>
 </section>
