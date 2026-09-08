@@ -115,12 +115,33 @@ function cfg() {
       i.value !== "" ? +i.value : DST_TIER_DEFAULTS[i.dataset.tier],
     ]);
   }
+  // A live draft in progress knows things the pre-draft board doesn't:
+  // who's actually gone (any team) and which of those are locked in as
+  // MINE. Every endpoint that reads `order` -- simulate, availability,
+  // export -- should plan around the real draft, not the untouched
+  // pre-draft list, so this is computed here once rather than in each
+  // call site. `gone_players` lets the server drop drafted players from
+  // its own pool (so it never re-simulates someone already on a real
+  // team); putting my real picks at the FRONT of `order` makes the
+  // server's own mock-draft mechanic for "my" team take them immediately,
+  // the same way engine.sim already treats a user's board -- no separate
+  // "here's my fixed roster" code path needed.
+  let order = ORDER;
+  let gonePlayers = [];
+  if (DRAFT) {
+    gonePlayers = DRAFT.picks.map(p => p.name);
+    const goneSet = new Set(gonePlayers);
+    const mineNames = DRAFT.picks.filter(p => p.owner === DRAFT.slot).map(p => p.name);
+    order = [...mineNames, ...ORDER.filter(n => !goneSet.has(n))];
+  }
+
   return {
     teams: +$("[name=teams]").value, slot: +$("[name=slot]").value,
     bench: +$("[name=bench]").value, style: $("[name=style]").value,
     preset: $("#preset").value, roster, scoring,
     last_weight: +$("#lastw").value,
-    order: ORDER,
+    order,
+    gone_players: gonePlayers,
     extra_players: EXTRA_PLAYERS,
   };
 }
@@ -157,9 +178,18 @@ function applyBuild(d) {
   ORDER = d.players.map(p => p.name);
   PLAYERS = {};
   d.players.forEach(p => { PLAYERS[p.name] = p; });
+  // ORDER/board is the app's curated, trimmed list (top ~4 K/DEF -- see
+  // engine/rank.py). A live draft isn't limited to that list -- any of the
+  // other 12 teams can take any real kicker or defense -- so the live
+  // tracker's search and roster-fill need the FULL pool. Only fills in
+  // names ORDER doesn't already have; never overwrites a board entry.
+  (d.pool || []).forEach(p => { if (!PLAYERS[p.name]) PLAYERS[p.name] = p; });
   renderBoard();
   renderTips(d.tips);
-  renderRosterPreview(d.rosterPreview);
+  // A live draft's roster preview shows your REAL picks (see
+  // refreshRosterPreview) -- never overwrite it with this fresh build's
+  // hypothetical simulated one.
+  if (!DRAFT) renderRosterPreview(d.rosterPreview);
   // A fresh build is a fresh optimal ranking — any manual reorder from
   // before is already gone (the server never reads a submitted order on
   // /api/build). Clear the leftover search box and its results too, so
@@ -462,7 +492,8 @@ function renderRosterPreview(roster) {
     return;
   }
   roster.forEach(p => {
-    const cls = "slot" + (p.slot === "BENCH" ? " bench" : "") + (p.empty ? " empty" : "");
+    const cls = "slot" + (p.slot === "BENCH" ? " bench" : "") + (p.empty ? " empty" : "")
+      + (p.actual === false ? " predicted" : "");
     const slot = el("div", cls);
     slot.append(el("div", "lbl", p.slot));
     const nm = el("div", "nm");
@@ -473,47 +504,90 @@ function renderRosterPreview(roster) {
                 el("span", "pts", `${p.pts} pts${p.bye ? " · bye " + p.bye : ""}`));
     }
     slot.append(nm);
+    // Only the live tracker's roster distinguishes real picks from a
+    // best-guess fill -- the pre-draft hypothetical preview has no
+    // `actual` field at all, so it renders exactly as before.
+    if (p.actual !== undefined) {
+      slot.append(el("span", "pill" + (p.actual ? " hi" : ""),
+                     p.actual ? "Locked in" : "Predicted"));
+    }
     box.append(slot);
   });
 }
 
-// Your ACTUAL roster from the live draft tracker, slotted the same greedy
-// way engine.sim._slot_for fills a team (mandatory positions first, in the
-// roster config's own order, then flex, then bench) -- except this reads
-// your real logged picks, not a simulated draft, and shows an empty slot
-// rather than guessing who'll eventually fill it.
+// Your roster from the live draft tracker: REAL picks where you have them,
+// the best remaining player as a placeholder everywhere else, so the panel
+// always reads as a complete team rather than a growing list of blanks.
+// Slotted the same greedy way engine.sim._slot_for fills a team (mandatory
+// positions first, in the roster config's own order, then flex, then
+// bench). "Best remaining" excludes every player ANY team has taken so
+// far, not just yours, and updates every time a new pick is logged.
 function myLiveRoster() {
   const roster = cfg().roster;
+  const bench = cfg().bench;
+  const gone = draftedNames();
   const mine = DRAFT.picks.filter(p => p.owner === DRAFT.slot)
     .map(p => PLAYERS[p.name]).filter(Boolean);
   const used = new Set();
   const result = [];
 
+  function bestRemaining(positions) {
+    for (const name of ORDER) {
+      if (gone.has(name) || used.has(name)) continue;
+      const p = PLAYERS[name];
+      if (p && positions.includes(p.pos)) return p;
+    }
+    // ORDER is the curated board -- only ~4 deep at K/DEF (engine/rank.py)
+    // -- so once those are drafted, fall back to the full pool (PLAYERS,
+    // see applyBuild) by raw points, rather than reporting no one left
+    // when 10 more real kickers/defenses are still sitting there.
+    let best = null;
+    for (const name in PLAYERS) {
+      if (gone.has(name) || used.has(name)) continue;
+      const p = PLAYERS[name];
+      if (p && positions.includes(p.pos) && (!best || p.pts > best.pts)) best = p;
+    }
+    return best;
+  }
+
+  function fillSlot(slot, positions) {
+    let p = mine.find(pl => !used.has(pl.name) && positions.includes(pl.pos));
+    let actual = true;
+    if (!p) { p = bestRemaining(positions); actual = false; }
+    if (p) { used.add(p.name); result.push({ ...p, slot, actual }); }
+    else result.push({ name: null, pos: positions[0], slot, empty: true });
+  }
+
   Object.entries(roster).forEach(([slot, n]) => {
     if (slot.includes("/")) return;
-    for (let i = 0; i < n; i++) {
-      const p = mine.find(pl => !used.has(pl.name) && pl.pos === slot);
-      if (p) { used.add(p.name); result.push({ ...p, slot }); }
-      else result.push({ name: null, pos: slot, slot, empty: true });
-    }
+    for (let i = 0; i < n; i++) fillSlot(slot, [slot]);
   });
   Object.entries(roster).forEach(([slot, n]) => {
     if (!slot.includes("/")) return;
-    const parts = slot.split("/");
-    for (let i = 0; i < n; i++) {
-      const p = mine.find(pl => !used.has(pl.name) && parts.includes(pl.pos));
-      if (p) { used.add(p.name); result.push({ ...p, slot }); }
-      else result.push({ name: null, pos: slot, slot, empty: true });
-    }
+    for (let i = 0; i < n; i++) fillSlot(slot, slot.split("/"));
   });
-  // Anything drafted beyond the starting slots is real bench depth --
-  // show it, don't hide it just because it exceeds the configured bench
-  // count (a real draft can end up deeper at one spot than planned).
-  mine.filter(pl => !used.has(pl.name)).forEach(pl => result.push({ ...pl, slot: "BENCH" }));
+
+  // Bench: real extra picks first (actual), then predicted best-remaining
+  // up to the configured bench size -- never MORE than configured, unlike
+  // starters, since an infinite predicted bench isn't useful.
+  mine.filter(pl => !used.has(pl.name)).forEach(pl => {
+    used.add(pl.name); result.push({ ...pl, slot: "BENCH", actual: true });
+  });
+  const benchHave = result.filter(r => r.slot === "BENCH").length;
+  for (let i = benchHave; i < bench; i++) {
+    const p = bestRemaining(["QB", "RB", "WR", "TE", "K", "DEF"]);
+    if (!p) break;
+    used.add(p.name);
+    result.push({ ...p, slot: "BENCH", actual: false });
+  }
   return result;
 }
 
 async function refreshRosterPreview() {
+  // A live draft in progress has a REAL roster -- never overwrite it with
+  // a fresh hypothetical simulated one just because this button (normally
+  // hidden once tracking starts, see draftstart/draftrestart) got clicked.
+  if (DRAFT) { renderRosterPreview(myLiveRoster()); return; }
   const btn = $("#updateroster");
   btn.disabled = true; btn.textContent = "Updating…";
   try {
@@ -900,10 +974,14 @@ $("#draftsearchbox").addEventListener("input", () => {
   const box = $("#draftsearchresults");
   if (q.length < 2) { box.replaceChildren(); return; }
   const gone = draftedNames();
-  const hits = ORDER.filter(n => !gone.has(n) && n.toLowerCase().includes(q))
-                    .slice(0, 8);
+  // The full pool (see applyBuild), not just the curated board -- a real
+  // draft can take any of the other kickers/defenses the board trimmed off.
+  const hits = Object.keys(PLAYERS).filter(n => !gone.has(n) && n.toLowerCase().includes(q))
+    .sort((a, b) => a.toLowerCase().startsWith(q) === b.toLowerCase().startsWith(q)
+      ? 0 : a.toLowerCase().startsWith(q) ? -1 : 1)
+    .slice(0, 8);
   if (!hits.length) {
-    box.replaceChildren(el("p", "searchmsg", "No match in your list."));
+    box.replaceChildren(el("p", "searchmsg", "No match in the player pool."));
     return;
   }
   box.replaceChildren(...hits.map(n => {

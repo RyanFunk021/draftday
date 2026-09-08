@@ -115,7 +115,7 @@ Your likely starting roster, including bench
 One example draft using this exact list, against eleven teams on Yahoo's default board. It does not update automatically as you reorder your list above. Press the button when you want to see it recalculated.
 
 ## roster-live-note
-Tracking your real draft below — this updates automatically with your actual picks, empty slots and all.
+Tracking your real draft below — locked-in slots are picks you've actually made, predicted slots are a best guess at who's left when you get there. Updates automatically as picks happen.
 
 ## roster-update-button
 Update team

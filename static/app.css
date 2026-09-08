@@ -235,6 +235,9 @@ button.ghost:hover:not(:disabled) {
 .roster-preview .slot .pts { display: block; font-size: 11px; color: var(--muted); font-weight: 400; margin-top: 1px; }
 .roster-preview .slot.empty .nm { color: var(--bad); font-style: italic; }
 .roster-preview .slot.bench { opacity: .82; }
+.roster-preview .slot.predicted { border-style: dashed; opacity: .78; }
+.roster-preview .slot.predicted .nm { font-style: italic; }
+.roster-preview .slot .pill { display: block; width: fit-content; margin-top: 5px; }
 .rosterlivenote { color: var(--accent-bright); }
 
 #simprogress { margin-top: 12px; }

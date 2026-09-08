@@ -20,21 +20,21 @@
   <form id="cfg">
     <div class="grid">
       <label>Teams <input name="teams" type="number" value="12" min="4" max="20"></label>
-      <label>Your pick <input name="slot" type="number" value="1" min="1" max="20"></label>
-      <label>Bench <input name="bench" type="number" value="6" min="0" max="12"></label>
+      <label>Your pick <input name="slot" type="number" value="9" min="1" max="20"></label>
+      <label>Bench <input name="bench" type="number" value="8" min="0" max="12"></label>
       <label>Draft
         <select name="style"><option value="snake">Snake</option>
         <option value="linear">Linear</option></select>
       </label>
       <label>Scoring
         <select id="preset"><option value="half_ppr">Half PPR</option>
-        <option value="ppr">Full PPR</option>
+        <option value="ppr" selected>Full PPR</option>
         <option value="standard">Standard</option></select>
       </label>
     </div>
     <div id="roster" class="grid roster"></div>
 
-    <details id="customscoring">
+    <details id="customscoring" open>
       <summary>{{ c['custom-scoring-summary'] }}</summary>
       <p class="hint">{{ c['custom-scoring-hint'] }}</p>
       <div class="grid scoring">
@@ -51,27 +51,27 @@
         <label>FG 40-49 <input data-s="fg_40_49" type="number" step="0.5" placeholder="4"></label>
         <label>FG 50+ <input data-s="fg_50" type="number" step="0.5" placeholder="5"></label>
         <label>PAT <input data-s="pat" type="number" step="0.5" placeholder="1"></label>
-        <label>DST sack <input data-s="dst_sack" type="number" step="0.5" placeholder="1"></label>
-        <label>DST turnover <input data-s="dst_turnover" type="number" step="0.5" placeholder="2"></label>
+        <label>DST sack <input data-s="dst_sack" type="number" step="0.5" value="0"></label>
+        <label>DST turnover <input data-s="dst_turnover" type="number" step="0.5" value="0"></label>
         <label>DST TD <input data-s="dst_td" type="number" step="0.5" placeholder="6"></label>
       </div>
 
       <p class="hint tierhint">{{ c['dst-tiers-hint'] }}</p>
       <div class="grid scoring tiers">
-        <label>Pts allowed 0 <input data-tier="0" type="number" step="0.5" placeholder="10"></label>
-        <label>Pts allowed 1-6 <input data-tier="6" type="number" step="0.5" placeholder="7"></label>
-        <label>Pts allowed 7-13 <input data-tier="13" type="number" step="0.5" placeholder="4"></label>
-        <label>Pts allowed 14-20 <input data-tier="20" type="number" step="0.5" placeholder="1"></label>
-        <label>Pts allowed 21-27 <input data-tier="27" type="number" step="0.5" placeholder="0"></label>
-        <label>Pts allowed 28-34 <input data-tier="34" type="number" step="0.5" placeholder="-1"></label>
-        <label>Pts allowed 35+ <input data-tier="999" type="number" step="0.5" placeholder="-4"></label>
+        <label>Pts allowed 0 <input data-tier="0" type="number" step="0.5" value="0"></label>
+        <label>Pts allowed 1-6 <input data-tier="6" type="number" step="0.5" value="0"></label>
+        <label>Pts allowed 7-13 <input data-tier="13" type="number" step="0.5" value="0"></label>
+        <label>Pts allowed 14-20 <input data-tier="20" type="number" step="0.5" value="0"></label>
+        <label>Pts allowed 21-27 <input data-tier="27" type="number" step="0.5" value="0"></label>
+        <label>Pts allowed 28-34 <input data-tier="34" type="number" step="0.5" value="0"></label>
+        <label>Pts allowed 35+ <input data-tier="999" type="number" step="0.5" value="0"></label>
       </div>
     </details>
 
     <h2>{{ c['weights-heading'] }}</h2>
     <div class="weights">
-      <div class="ends"><b id="lastwv-proj">50</b> projections &middot; last year <b id="lastwv-last">50</b></div>
-      <input id="lastw" type="range" min="0" max="100" value="50">
+      <div class="ends"><b id="lastwv-proj">65</b> projections &middot; last year <b id="lastwv-last">35</b></div>
+      <input id="lastw" type="range" min="0" max="100" value="35">
       <div class="ends"><span>This year's projections</span><span>Last year's results</span></div>
     </div>
     <p class="hint">{{ c['weights-hint'] }}</p>

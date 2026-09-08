@@ -171,9 +171,17 @@ def build():
         order, pool, L["slot"], L["teams"], L["roster"], L["bench"],
         L["style"])
 
+    # engine.rank.build_list keeps only its top few K/DEF on `order` (a real
+    # draft never goes deeper than that against THIS list) but a live draft
+    # still has 12 real kickers and defenses getting taken -- the live
+    # tracker's search needs the full pool to find them, not just the board.
+    pool_index = [{k: p.get(k) for k in ("name", "pos", "team", "bye", "pts")}
+                  for p in pool]
+
     return jsonify({
         "league": L,
         "players": players,
+        "pool": pool_index,
         "tips": tips,
         "rosterPreview": roster_preview,
         "asOf": time.strftime("%Y-%m-%d"),
@@ -244,7 +252,8 @@ def _draft_tips(order: list[dict], L: dict) -> dict:
     return {"top": top[:20], "value": value[:20], "deep": deep[:20]}
 
 
-def _pool_too_shallow(pool: list[dict], L: dict) -> str | None:
+def _pool_too_shallow(pool: list[dict], L: dict, gone_total: int = 0,
+                      gone_by_pos: dict[str, int] | None = None) -> str | None:
     """A league the pool cannot fill would produce numbers that measure the
     data, not the roster. Returns an error string, or None if fine.
 
@@ -260,23 +269,65 @@ def _pool_too_shallow(pool: list[dict], L: dict) -> str | None:
          team's roster (including "yours") came back short, with whole
          position groups like DEF or WR/RB/TE flex missing entirely, and
          nothing in the response said why.
+
+    `gone_total`/`gone_by_pos` (see _exclude_gone) are the players a live
+    draft has already taken -- `pool` here has already had them removed, so
+    without this adjustment the requirement stays fixed at a FULL draft's
+    worth of slots even after most of them are filled, and this guard would
+    start firing false positives partway through a real draft (e.g. once
+    fewer than `teams * (starters + bench)` players remain in the pool,
+    even though far fewer than that many picks are actually still needed).
     """
+    gone_by_pos = gone_by_pos or {}
     have: dict[str, int] = {}
     for p in pool:
         have[p["pos"]] = have.get(p["pos"], 0) + 1
     for pos, need in L["roster"].items():
-        if "/" not in pos and have.get(pos, 0) < need * L["teams"]:
-            return f"Not enough {pos}s in the player pool for {L['teams']} teams."
+        if "/" not in pos:
+            required = need * L["teams"] - gone_by_pos.get(pos, 0)
+            if have.get(pos, 0) < required:
+                return f"Not enough {pos}s in the player pool for {L['teams']} teams."
 
     starters = sum(n for pos, n in L["roster"].items())
-    needed = L["teams"] * (starters + L["bench"])
+    needed = L["teams"] * (starters + L["bench"]) - gone_total
     if len(pool) < needed:
-        return (f"This league needs {needed} drafted players "
+        return (f"This league needs {needed} more drafted players "
                 f"({L['teams']} teams x {starters + L['bench']} roster "
-                f"spots) and the player pool only has {len(pool)}. Lower "
-                f"the bench size or team count, or this league is too deep "
-                f"for the data behind this tool.")
+                f"spots{f', {gone_total} already picked' if gone_total else ''}) "
+                f"and the player pool only has {len(pool)} left. Lower the "
+                f"bench size or team count, or this league is too deep for "
+                f"the data behind this tool.")
     return None
+
+
+def _exclude_gone(pool: list[dict],
+                  payload: dict) -> tuple[list[dict], int, dict[str, int]]:
+    """Drop players a live draft has already taken -- any team, from the
+    client's own turn-by-turn tracker (static/app.js's cfg() sends every
+    logged name as `gone_players` once a draft is being tracked).
+
+    Without this, a mid-draft call to simulate/availability/roster-preview
+    would plan around the ORIGINAL pre-draft pool as if no picks had
+    happened yet: re-"drafting" a player someone else already has for real,
+    or crediting a bench slot to someone who's actually off the board.
+
+    Returns (remaining_pool, gone_total, gone_by_pos) -- the latter two feed
+    _pool_too_shallow, which needs to know how many slots picks already
+    made have satisfied, not just how many players are left to draw from.
+    """
+    gone = set(payload.get("gone_players") or [])
+    if not gone:
+        return pool, 0, {}
+    remaining: list[dict] = []
+    gone_by_pos: dict[str, int] = {}
+    gone_total = 0
+    for p in pool:
+        if p["name"] in gone:
+            gone_total += 1
+            gone_by_pos[p["pos"]] = gone_by_pos.get(p["pos"], 0) + 1
+        else:
+            remaining.append(p)
+    return remaining, gone_total, gone_by_pos
 
 
 def _order_from(payload: dict, pool: list[dict], L: dict) -> list[dict]:
@@ -309,9 +360,10 @@ def simulate():
     L = league_from(payload)
     pool = load_pool(L["scoring"], L["last_weight"],
                      extra_rows=_extras_from(payload))
+    pool, gone_total, gone_by_pos = _exclude_gone(pool, payload)
     order = _order_from(payload, pool, L)
 
-    err = _pool_too_shallow(pool, L)
+    err = _pool_too_shallow(pool, L, gone_total, gone_by_pos)
     if err:
         return jsonify({"error": err}), 400
 
@@ -358,9 +410,10 @@ def roster_preview():
     L = league_from(payload)
     pool = load_pool(L["scoring"], L["last_weight"],
                      extra_rows=_extras_from(payload))
+    pool, gone_total, gone_by_pos = _exclude_gone(pool, payload)
     order = _order_from(payload, pool, L)
 
-    err = _pool_too_shallow(pool, L)
+    err = _pool_too_shallow(pool, L, gone_total, gone_by_pos)
     if err:
         return jsonify({"error": err}), 400
 
@@ -383,9 +436,10 @@ def availability():
     L = league_from(payload)
     pool = load_pool(L["scoring"], L["last_weight"],
                      extra_rows=_extras_from(payload))
+    pool, gone_total, gone_by_pos = _exclude_gone(pool, payload)
     order = _order_from(payload, pool, L)
 
-    err = _pool_too_shallow(pool, L)
+    err = _pool_too_shallow(pool, L, gone_total, gone_by_pos)
     if err:
         return jsonify({"error": err}), 400
 

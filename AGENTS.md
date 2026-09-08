@@ -32,7 +32,14 @@ Directory map — read the nested AGENTS.md before working in that folder:
    (`check_availability`), or plays out full simulated seasons
    (`run_raw`/`summarize`) against a modeled field of opponents (half "live"
    human-like drafters with reach/run/need behavior, half mechanical
-   Yahoo-style autodraft).
+   Yahoo-style autodraft). All three routes (`/api/roster-preview`,
+   `/api/availability`, `/api/simulate`) call `app.py`'s `_exclude_gone()`
+   first, which drops any player the live draft tracker has already logged
+   as taken (`payload["gone_players"]`, sent by `static/app.js`'s `cfg()`)
+   and adjusts `_pool_too_shallow()`'s depth requirement down by however
+   many of those slots are already filled — without that adjustment the
+   guard would start false-failing partway through a real draft, once fewer
+   than a FULL draft's worth of players remain in the (now smaller) pool.
 6. `/api/export` returns the final order as a Yahoo-import CSV.
 
 ## Key architectural facts worth knowing before changing anything
@@ -77,22 +84,33 @@ explicitly).
 
 ## Live draft tracker ("Run your draft")
 
-Everything above `app.py`'s routes is **pre-draft** planning. The live
-tracker layered on top of it (entirely in `static/app.js`, no new server
-endpoints — see `static/AGENTS.md`) is what actually helps during the real
+Everything else on the page is **pre-draft** planning. The live tracker
+layered on top of it (state lives entirely in `static/app.js`, no new
+routes — see `static/AGENTS.md`) is what actually helps during the real
 draft: log every real pick, in turn order, as it happens (yours and
 everyone else's), and get a "draft queue" that re-ranks itself as the room
-moves, plus a small chart for comparing candidates head to head. Undo
-supports fixing a misclick.
+moves, a floor/ceiling comparison chart, and a roster panel that always
+shows a full team — your real picks plus a best-guess prediction for every
+slot you haven't filled yet, each clearly labeled "Locked in" or
+"Predicted" so the two are never confused.
+
+Once tracking starts, `cfg()` changes what it sends on EVERY subsequent
+request (not just tracker-specific ones): `order` gets your real picks
+moved to the front (so the server's own mock-draft mechanic for "my" team
+takes them immediately) followed by the rest of the board with every gone
+player removed, and a new `gone_players` list rides along so the server can
+drop those same names from its pool. This is why "Simulate the season" and
+the pre-draft board's availability check both automatically reflect a
+live draft in progress without needing separate tracker-aware endpoints —
+see the `_exclude_gone` note in "Request flow" above.
 
 Two things this does NOT do, worth knowing before extending it:
 - It doesn't track full opponent rosters (only *your* roster and the set of
   gone players) — no opponent-need modeling, only your own.
-- It's independent of `engine.sim`'s Monte Carlo availability math entirely
-  — the queue's "run detection" is a simple recent-picks heuristic in
-  `static/app.js` (`recentPositionShare`), not a simulation. If a more
-  rigorous "odds he lasts to my next real pick" number is wanted, that's
-  where `engine.sim.check_availability` could be wired in, conditioned on
-  the real gone-players set instead of a simulated board.
+- The queue's "run detection" is a simple recent-picks heuristic in
+  `static/app.js` (`recentPositionShare`), not a simulation — it's separate
+  from `engine.sim.check_availability`'s Monte Carlo math, which IS now
+  reachable mid-draft (see above) but isn't wired into the queue itself.
 
-See `static/AGENTS.md` for exactly how the queue scoring and chart work.
+See `static/AGENTS.md` for exactly how the queue scoring, roster fill, and
+chart work.
